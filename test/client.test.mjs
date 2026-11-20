@@ -183,3 +183,14 @@ test('renders the header chevron only when the session records a preset', () => 
   assert.equal(trigger.props['aria-haspopup'], 'menu')
   assert.equal(trigger.props['aria-expanded'], false)
 })
+
+test('renders nothing when the preset projection is null', () => {
+  const { ctx, slots } = fakeContext()
+  plugin.apply(ctx)
+  const Component = slots[0].component
+  assert.equal(
+    Component({ sessionId: 'session-1', t: key => key, useSessions: () => null }),
+    null,
+    'a null projection records no preset, so the header entry stays hidden',
+  )
+})
