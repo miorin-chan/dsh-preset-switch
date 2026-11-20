@@ -14,8 +14,14 @@ await import('../client.js')
 
 assert.equal(registration.id, 'dsh-preset-switch')
 
-/** A React stub: the factory only renders inside the page, never during apply. */
-const reactStub = { createElement: () => null }
+/** A React stub: enough for the component's first render, no page needed. */
+const reactStub = {
+  createElement: (type, props, ...children) => ({ type, props: props ?? {}, children }),
+  useState: value => [value, () => undefined],
+  useEffect: () => undefined,
+  useRef: () => ({ current: null }),
+  useMemo: factory => factory(),
+}
 const plugin = registration.factory(name => {
   if (name === 'react') return reactStub
   throw new Error(`unexpected module ${name}`)
@@ -162,4 +168,18 @@ test('a row id that now names another module is reported as a replacement', () =
   const impact = plugin.internals.diffCompositions(standard, replaced)
   assert.deepEqual(impact.removed.map(row => row.id), ['workflow-ptc'])
   assert.deepEqual(impact.added.map(row => row.name), ['@deepseek-ai/dsh-workflow-native'])
+})
+
+test('renders the header chevron only when the session records a preset', () => {
+  const { ctx, slots } = fakeContext()
+  plugin.apply(ctx)
+  const Component = slots[0].component
+  assert.equal(Component({ sessionId: 'session-1', t: key => key, useSessions: () => undefined }), null)
+
+  const tree = Component({ sessionId: 'session-1', t: key => key, useSessions: () => 'standard' })
+  assert.equal(tree.type, 'span')
+  const trigger = tree.children.find(child => child !== null && child.props?.className === 'dshps-trigger')
+  assert.ok(trigger, 'the chevron button renders beside the shipped label')
+  assert.equal(trigger.props['aria-haspopup'], 'menu')
+  assert.equal(trigger.props['aria-expanded'], false)
 })
