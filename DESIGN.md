@@ -1,0 +1,67 @@
+# 设计：空闲时切换 Agent 模式
+
+## 背景
+
+DSH 的 Agent preset 是会话的组合：它决定挂载哪些插件、模型看到哪些工具和提示词片段。
+官方界面只在“新任务”页提供选择器；会话开始后，标题栏只剩一个只读的模式名，
+Host 的 `agent-presets/select` 也会以 `agent-preset/locked` 拒绝切换。
+
+这个包补上“会话中途换组合”的用户入口，同时保留 DSH 原有的事实边界：换组合这件事必须由用户显式发起，
+并且只在一个安全的边界上发生。
+
+## 机制
+
+### Host：命令而不是新的 Remote
+
+Web 客户端的 Remote 命名空间来自构建期的装配，第三方 bundle 加不了新的 namespace。
+因此切换走现有的命令通道：Host 注册 `/preset-switch <preset-id>`，Client 用 `live.command()` 提交，
+和 `/permission` 的提交方式一致。
+
+命令处理器只做四件事：
+
+1. 拒绝有未结束回合并拒绝正在压缩的会话。
+2. 按 Agent 串行化，避免两次切换交错。
+3. `agentPresets.resolve()` 校验目标定义，`agentPresets.recompose()` 在 Agent 的 scope 上挂载新组合。
+4. 追加 `agent-preset/selected`，让投影、恢复与各客户端界面从日志得到新身份。
+
+`recompose()` 会发出 `tools/change`。下一回合的 `request/header` 记录新工具清单，
+工具增删写成 `tool-addition`/`tool-removal` developer 消息，系统提示以 in-history 方式更新。
+这条路径与 DSH 现有的动态工具更新相同，不需要手工注入“上下文”。
+
+### Client：标题栏的 chevron
+
+组件注册在 `conversation.session.header.actions`，`order: -9`，紧跟官方只读模式名（`-10`）。
+它不覆盖官方注册、不读别人的 DOM，也不 import 私有 primitives；样式只用 `--dsw-alias-*` 主题 token，
+自带菜单与确认框的 markup。
+
+菜单数据来自 `agentPresets.list`，只列健康定义，排除当前模式。
+组件在当前会话没有记录预设时隐藏，与官方标签一致。
+
+### 动态影响分析
+
+点击目标后，Client 用 `agentPresets.read` 读取当前与目标声明，解析 Loader 的 entry-list YAML：
+
+- 每行以 `- ` 开始；`name: cordis:group` 是结构行，丢弃；无 id 也无 name 的行忽略。
+- 行身份取 `id`，没有则取模块名。
+- `disabled: true` 记为停用；`!!js` 条件视为启用，因为 Client 无法求值 Host 的平台表达式，
+  而且把每个平台条件都标成损失会让“什么都没变”的切换也弹确认。
+
+差分结果分三类：目标新增、目标缺失、目标停用当前启用的行。
+没有后两类时不弹确认，直接提交命令。
+代码里没有任何“标准→极简”之类的预设对应表，自定义预设与改过的内置预设自动适用同一规则。
+
+## 不变量
+
+- 有未结束回合或正在压缩时不切换；命令返回原因，组合不变。
+- 切换失败时当前组合保持；不写入选择事件。
+- 历史回合保留它们运行时的工具；新模式只影响之后的请求。
+- 纯新增的切换不打断用户；只有会移除或停用插件的切换才要求确认。
+- 只改 `config` 的行不提示。这是有意的取舍：persona 文案属于这类，提示会让常见切换变吵。
+
+## 边界
+
+- 影响分析到插件行为止，不到单个工具；需要工具级精确时，只能在切换后观察。
+- 不迁移会话级状态（goal、计划、后台任务、终端、子代理）。
+  它们由目标模式可能不挂载的插件拥有，切换既不停也不带走；需要时由用户先处理。
+- 不自动判断该用哪个模式；用户选择是唯一入口。
+- Host 命令接受任意已声明、可挂载的 preset id；它不重复 Client 的损失判断。

@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "Agent mode switch",
+    "description": "Switches a session's Agent preset while it is idle. The preset button in the session header opens it; a confirmation appears only when the new mode removes or disables plugins."
+  }
+}

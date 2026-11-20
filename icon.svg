@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="36" height="36" viewBox="0 0 36 36" fill="none">
+  <rect x="5.5" y="5.5" width="25" height="25" rx="8" fill="url(#dsh-preset-switch-icon)" fill-opacity="0.16" stroke="url(#dsh-preset-switch-icon)" stroke-width="1.6"/>
+  <path d="M11.8 14.6h12.4l-3.2-3.2" stroke="url(#dsh-preset-switch-icon)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M24.2 21.4H11.8l3.2 3.2" stroke="url(#dsh-preset-switch-icon)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+  <defs>
+    <linearGradient id="dsh-preset-switch-icon" x1="24" y1="9" x2="12" y2="27" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#7AC2FF"/>
+      <stop offset="1" stop-color="#4A65E8"/>
+    </linearGradient>
+  </defs>
+</svg>

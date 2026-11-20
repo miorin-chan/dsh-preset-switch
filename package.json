@@ -1,0 +1,58 @@
+{
+  "name": "dsh-preset-switch",
+  "version": "0.1.0",
+  "private": true,
+  "license": "MIT",
+  "description": "Switches a session's Agent preset while it is idle, warning only when the new mode removes or disables plugins.",
+  "type": "module",
+  "keywords": [
+    "deepseek-harness",
+    "dsh",
+    "dsh-plugin",
+    "agent-preset",
+    "mode",
+    "session"
+  ],
+  "exports": {
+    ".": "./index.js",
+    "./client": "./client.js",
+    "./locale/*.json": "./locale/*.json",
+    "./icon": "./icon.svg"
+  },
+  "files": [
+    "index.js",
+    "client.js",
+    "cordis.patch.yml",
+    "locale/*.json",
+    "icon.svg",
+    "README.md",
+    "AGENTS.md",
+    "AGENTS.local.md",
+    "DESIGN.md",
+    "CHANGELOG.md",
+    "docs/README.md",
+    "README.zh.md"
+  ],
+  "engines": {
+    "dsh": ">=0.2.2-rc.3"
+  },
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
+    "client": {
+      "platform": "web",
+      "immediately": true,
+      "inject": [
+        "@deepseek-ai/dsh-api-remotes",
+        "@deepseek-ai/dsh-api-session-controller",
+        "@deepseek-ai/dsh-client-locale",
+        "@deepseek-ai/dsh-client-ui-conversation",
+        "@deepseek-ai/dsh-client-ui-slots"
+      ]
+    }
+  },
+  "scripts": {
+    "test": "node --test"
+  }
+}

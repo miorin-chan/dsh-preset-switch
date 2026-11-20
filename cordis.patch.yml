@@ -1,0 +1,5 @@
+# Activates the bundle. The Host half registers `/preset-switch`; the Client half
+# ships through package.json `dsh.client` and adds the header control.
+- insert:
+    - id: dsh-preset-switch
+      name: 'dsh-preset-switch'
