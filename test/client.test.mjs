@@ -72,7 +72,8 @@ function fakeContext() {
 }
 
 test('declares the services it injects', () => {
-  assert.deepEqual(plugin.inject, ['locale', 'slots', 'sessions', 'remote'])
+  // `remote` alone gives the namespace table; each namespace is its own service.
+  assert.deepEqual(plugin.inject, ['locale', 'slots', 'sessions', 'remote', 'remote.agentPresets'])
 })
 
 test('registers labels and the header action, then releases both', () => {

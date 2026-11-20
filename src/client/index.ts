@@ -853,7 +853,7 @@ function createModeButton(ctx: ClientContext, reactModule: ReactModule) {
 type ModeButtonProps = PropsRuntime<'conversation.session.header.actions'> & PropsLocale<typeof NS>
 
 /** Services this module needs before `apply` runs. */
-export const inject = ['locale', 'slots', 'sessions', 'remote']
+export const inject = ['locale', 'slots', 'sessions', 'remote', 'remote.agentPresets']
 
 export function apply(ctx: ClientContext): void {
   ctx.effect(() => ctx.locale.register(NS, LABELS), `${NS}: locale`)

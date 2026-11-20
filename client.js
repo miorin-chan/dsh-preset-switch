@@ -697,7 +697,7 @@ function createModeButton(ctx, reactModule) {
     );
   };
 }
-var inject = ["locale", "slots", "sessions", "remote"];
+var inject = ["locale", "slots", "sessions", "remote", "remote.agentPresets"];
 function apply(ctx) {
   ctx.effect(() => ctx.locale.register(NS, LABELS), `${NS}: locale`);
   if (react === void 0) {
