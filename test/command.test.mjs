@@ -8,11 +8,13 @@ function fakeHost(options = {}) {
   const effects = []
   const appended = []
   const recomposed = []
+  const events = options.events ?? []
   const session = {
-    events: options.events ?? [],
+    get seq() { return events.length },
+    eventAt(index) { return events[index] },
     append(type, data) {
       appended.push({ type, data })
-      return { seq: appended.length }
+      return { seq: events.length + appended.length }
     },
   }
   const agent = { id: 'session-1', ctx: {}, session }

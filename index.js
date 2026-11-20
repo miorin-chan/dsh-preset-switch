@@ -41,20 +41,23 @@ const USAGE = 'Usage: /preset-switch <preset-id>'
  * @returns true while a compaction holds its lock.
  */
 function compactionActive(session) {
-  const events = session.events
-  let lifetimeStart = 0
-  for (let index = events.length - 1; index >= 0; index -= 1) {
-    if (events[index].type === 'session/end-seed') {
-      lifetimeStart = index + 1
-      break
+  let latestEndSeedSeq = -1
+  let marker
+  for (let seq = session.seq - 1; seq >= 0; seq -= 1) {
+    const event = session.eventAt(seq)
+    if (event === undefined) continue
+    if (event.type === 'session/end-seed') {
+      if (latestEndSeedSeq < 0) latestEndSeedSeq = seq
+      if (marker !== undefined) break
+      continue
+    }
+    if (marker === undefined && (event.type === 'compaction/start' || event.type === 'compaction/end')) {
+      marker = { type: event.type, seq }
+      if (latestEndSeedSeq >= 0) break
     }
   }
-  for (let index = events.length - 1; index >= lifetimeStart; index -= 1) {
-    const type = events[index].type
-    if (type === 'compaction/end') return false
-    if (type === 'compaction/start') return true
-  }
-  return false
+  if (marker === undefined || marker.type === 'compaction/end') return false
+  return marker.seq > latestEndSeedSeq
 }
 
 /**
