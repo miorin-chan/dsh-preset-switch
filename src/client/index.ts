@@ -272,11 +272,16 @@ const LABELS: Record<BuiltInLocaleId, Record<LabelKey, string>> & Record<LocaleI
  */
 const STYLES = `
 .dshps-root {
+  /* The actions strip spaces its items by 10px. A zero-width entry would add
+     a second gap around itself, so the resting end margin cancels one; the
+     revealed start margin then leaves 4px between the preset pill and the
+     button, the same gap the Workspace label puts before its ellipsis. */
   position: relative; display: inline-flex; align-items: center; flex: none;
   height: 24px; width: 0; overflow: clip;
-  transition: width 160ms ease, margin-inline-start 160ms ease;
+  margin-inline-start: 0; margin-inline-end: -10px;
+  transition: width 160ms ease, margin-inline-start 160ms ease, margin-inline-end 160ms ease;
 }
-.dshps-root[data-revealed='true'] { width: 22px; margin-inline-start: 2px; }
+.dshps-root[data-revealed='true'] { width: 22px; margin-inline-start: -6px; margin-inline-end: 0; }
 .dshps-trigger {
   display: inline-flex; align-items: center; justify-content: center;
   width: 22px; height: 22px; padding: 0;
@@ -291,7 +296,7 @@ const STYLES = `
   .dshps-trigger:hover { background: var(--dsw-alias-interactive-bg-hover); color: var(--dsw-alias-label-primary); }
 }
 @media (hover: none) {
-  .dshps-root { width: 22px; margin-inline-start: 2px; }
+  .dshps-root { width: 22px; margin-inline-start: -6px; margin-inline-end: 0; }
   .dshps-trigger { opacity: 1; transform: none; pointer-events: auto; }
 }
 .dshps-trigger:focus-visible { outline: 2px solid var(--dsw-alias-border-selected); outline-offset: 1px; }

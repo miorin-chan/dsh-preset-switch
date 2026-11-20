@@ -22,3 +22,5 @@
 - Re-read the preset roster every time the picker opens, and show the Remote error message when that read fails.
 - Treat a pointer inside the portaled picker or dialog as inside: outside-click no longer dismisses the picker
   before a row's click runs.
+- Cancel the header actions strip's 10px gap around the resting slot and reveal the chevron 4px after the preset pill,
+  matching the Workspace label's ellipsis spacing.
