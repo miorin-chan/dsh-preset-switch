@@ -30,15 +30,27 @@ Check whether new behavior belongs in its own bundle.
 
 ## Structure
 
-- [client.js](client.js) is the hand-written browser module.
-  Read its header before changing it.
-- [index.js](index.js) registers the Host `/preset-switch` command: idle checks, serialization,
-  `agentPresets.recompose()`, and the `agent-preset/selected` event.
-- Keep Plugin Manager metadata in `locale/*.json` and runtime translations in `LABELS` in the browser module.
+- `src/client/index.ts` is the browser half's source; `client.js` is generated
+  by `node scripts/build.mjs` and committed.
+  Read the mechanism note at the top of the source before changing it.
+  Do not hand-edit the artifact — the `--check` mode in `npm run check` keeps it in sync with the source.
+- `src/host/index.ts` is the Host half: it registers the `/preset-switch` command, owns the idle/compaction checks,
+  serializes switches per Agent, calls `agentPresets.recompose()`, and appends the `agent-preset/selected` event.
+- `tsconfig.json`, `scripts/build.mjs`, and `scripts/sync-types.mjs` are the TypeScript base copied
+  from the workspace `tools/dsh-plugin-ts/` template.
+  Types are used only through `import type`, so neither artifact carries a runtime `@deepseek-ai/*` dependency.
+- The session-log scan reads the typed `SessionEvent` union from `@deepseek-ai/dsh-session`;
+  the `compaction/*` members arrive through `@deepseek-ai/dsh-compaction/types`.
+  Keep both in the program when editing the scan — that union is the reason this half is typed.
+- The Client half names its own services in a local interface because one tsconfig compiles both halves:
+  the Host and Client assemblies declare different `sessions` faces on the Cordis Context.
+  Do not read that merged `ctx.sessions` in the browser source.
+- Keep Plugin Manager metadata in `locale/*.json` and runtime translations in `LABELS` in the browser source.
 - [test/client.test.mjs](test/client.test.mjs) uses a fake `ctx` to check registration and cleanup,
   and checks the row parser and additive/removal/disable classification.
 - [test/command.test.mjs](test/command.test.mjs) covers idle/compaction refusals, the no-op case,
   and the committed `agent-preset/selected` event.
+- Both tests load the built `client.js`/`index.js`, so the source migration does not change them.
 - `docs/scripts/reflow` is the standalone documentation formatter and requires Python 3.11 or newer.
 
 ## Implementation
@@ -60,17 +72,17 @@ Update `CHANGELOG.md` when releasing.
 
 ## Verification
 
-- Run `node --test` and `node --check client.js && node --check index.js` from the project directory.
-- From the workspace root, run `node tools/new-dsh-plugin/cli.mjs --check plugins/<id>` to check the manifest,
-  locale JSON, and the other scaffold files.
+- Run `npm run check` from the project directory: `node --test`, `tsc -p tsconfig.json`,
+  `node scripts/build.mjs --check`, and `node scripts/sync-types.mjs --check` check behavior, types,
+  artifact freshness, and the pinned type packages in that order.
+- After a DSH upgrade, run `node scripts/sync-types.mjs` to repin the type packages, then `npm run check`.
+- From the workspace root, run `node tools/new-dsh-plugin/cli.mjs --check plugins/dsh-preset-switch`.
 - Use a disposable profile for installation tests.
   Distinguish fixture results from observations in the UI.
 - After a DSH upgrade, run the tests and verify the behavior in the running UI.
   Record what to verify.
-
-## Markdown
-
 - Run `docs/scripts/reflow md <path>` to format edited Markdown.
+  The command requires Python 3.11 or newer.
 - Run `prek install` once per checkout to format staged Markdown at commit time.
   Keep the generated `AGENTS.md` byte-for-byte identical to the shared template.
 - When committing in the DSH sandbox, use `PREK_HOME="${TMPDIR:?}/prek-dsh" git commit -m "<commit message>"`
