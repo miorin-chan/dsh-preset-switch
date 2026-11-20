@@ -34,8 +34,16 @@ Web 客户端的 Remote 命名空间来自构建期的装配，第三方 bundle 
 它不覆盖官方注册、不读别人的 DOM，也不 import 私有 primitives；样式只用 `--dsw-alias-*` 主题 token，
 自带菜单与确认框的 markup。
 
-菜单数据来自 `agentPresets.list`，只列健康定义，排除当前模式。
+chevron 平时收起为零宽，悬停会话标题栏或键盘聚焦时按工作区标签的同一节奏滑出（宽度、
+外边距、透明度与位移一起过渡）；没有 hover 的设备常显，避免唯一的入口消失。
+弹层用 `react-dom` 的 `createPortal` 挂到 `document.body`：标题栏会裁剪并带有 transform，
+留在原地时 `position: fixed` 也可能被祖先的包含块约束。
 组件在当前会话没有记录预设时隐藏，与官方标签一致。
+
+菜单数据来自 `agentPresets.list`，只列健康定义，排除当前模式；每次打开菜单都重读一次，
+首次读取失败或列表变化后无需刷新页面。
+读取失败时显示 Remote 返回的原始消息。
+外部点击只在指针落于触发器、菜单和确认框之外时才关闭。
 
 ### 动态影响分析
 

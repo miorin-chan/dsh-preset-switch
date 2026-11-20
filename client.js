@@ -210,16 +210,28 @@ var LABELS = {
   }
 };
 var STYLES = `
-.dshps-root { position: relative; display: inline-flex; align-items: center; }
+.dshps-root {
+  position: relative; display: inline-flex; align-items: center; flex: none;
+  height: 24px; width: 0; overflow: clip;
+  transition: width 160ms ease, margin-inline-start 160ms ease;
+}
+.dshps-root[data-revealed='true'] { width: 22px; margin-inline-start: 2px; }
 .dshps-trigger {
   display: inline-flex; align-items: center; justify-content: center;
-  width: 22px; height: 22px; padding: 0; margin-left: 2px;
+  width: 22px; height: 22px; padding: 0;
   border: none; border-radius: var(--dsw-radius-xs);
   background: var(--dsw-alias-fill-tsp-secondary);
   color: var(--dsw-alias-label-tertiary); cursor: pointer;
+  opacity: 0; transform: translateX(-8px); pointer-events: none;
+  transition: opacity 120ms ease, transform 160ms ease, background-color 120ms ease, color 120ms ease;
 }
+.dshps-root[data-revealed='true'] .dshps-trigger { opacity: 1; transform: none; pointer-events: auto; }
 @media (hover: hover) {
   .dshps-trigger:hover { background: var(--dsw-alias-interactive-bg-hover); color: var(--dsw-alias-label-primary); }
+}
+@media (hover: none) {
+  .dshps-root { width: 22px; margin-inline-start: 2px; }
+  .dshps-trigger { opacity: 1; transform: none; pointer-events: auto; }
 }
 .dshps-trigger:focus-visible { outline: 2px solid var(--dsw-alias-border-selected); outline-offset: 1px; }
 .dshps-trigger:disabled { cursor: default; color: var(--dsw-alias-label-quaternary); }
@@ -388,6 +400,16 @@ function loadReact() {
   }
 }
 var react = loadReact();
+function loadReactDom() {
+  try {
+    const loaded = require("react-dom");
+    if (typeof loaded !== "object" || loaded === null || !("createPortal" in loaded)) return void 0;
+    return typeof loaded.createPortal === "function" ? loaded : void 0;
+  } catch {
+    return void 0;
+  }
+}
+var reactDom = loadReactDom();
 async function readComposition(ctx, id) {
   const result = await ctx.remote.agentPresets.read(id);
   if (!result.ok) throw new Error(result.error.message);
@@ -400,6 +422,7 @@ function createModeButton(ctx, reactModule) {
     const current = typeof props.useSessions === "function" ? props.useSessions((state) => state.byId[sessionId]?.projectionValues?.agentPreset) : void 0;
     const currentPresetId = current === null ? void 0 : current;
     const [open, setOpen] = reactModule.useState(false);
+    const [revealed, setRevealed] = reactModule.useState(false);
     const [anchor, setAnchor] = reactModule.useState(null);
     const [roster, setRoster] = reactModule.useState({ status: "loading", presets: [], error: null });
     const [busy, setBusy] = reactModule.useState(false);
@@ -407,9 +430,13 @@ function createModeButton(ctx, reactModule) {
     const [confirm, setConfirm] = reactModule.useState(null);
     const rootRef = reactModule.useRef(null);
     const triggerRef = reactModule.useRef(null);
+    const menuRef = reactModule.useRef(null);
+    const dialogRef = reactModule.useRef(null);
     const cancelRef = reactModule.useRef(null);
     reactModule.useEffect(() => {
+      if (!open) return void 0;
       let alive = true;
+      setRoster((state) => ({ status: "loading", presets: state.presets, error: null }));
       ctx.remote.agentPresets.list().then((result) => {
         if (!alive) return;
         if (!result.ok) {
@@ -431,13 +458,44 @@ function createModeButton(ctx, reactModule) {
       return () => {
         alive = false;
       };
+    }, [open]);
+    reactModule.useEffect(() => {
+      const root = rootRef.current;
+      const host = root?.closest("header") ?? root?.parentElement;
+      if (host === null || host === void 0) return void 0;
+      const hoverCapable = typeof window.matchMedia === "function" ? window.matchMedia("(hover: hover)").matches : true;
+      if (!hoverCapable) {
+        setRevealed(true);
+        return void 0;
+      }
+      const show = () => {
+        setRevealed(true);
+      };
+      const hide = () => {
+        setRevealed(false);
+      };
+      const focusOut = (event) => {
+        const next = event.relatedTarget;
+        if (!(next instanceof Node) || !host.contains(next)) setRevealed(false);
+      };
+      host.addEventListener("pointerenter", show);
+      host.addEventListener("pointerleave", hide);
+      host.addEventListener("focusin", show);
+      host.addEventListener("focusout", focusOut);
+      return () => {
+        host.removeEventListener("pointerenter", show);
+        host.removeEventListener("pointerleave", hide);
+        host.removeEventListener("focusin", show);
+        host.removeEventListener("focusout", focusOut);
+      };
     }, []);
     reactModule.useEffect(() => {
       if (!open) return void 0;
       const onPointer = (event) => {
-        const root = rootRef.current;
         const target = event.target;
-        if (root !== null && target instanceof Node && !root.contains(target)) setOpen(false);
+        if (!(target instanceof Node)) return;
+        const inside = rootRef.current?.contains(target) === true || menuRef.current?.contains(target) === true || dialogRef.current?.contains(target) === true;
+        if (!inside) setOpen(false);
       };
       const onKey = (event) => {
         if (event.key !== "Escape") return;
@@ -545,6 +603,7 @@ function createModeButton(ctx, reactModule) {
       "div",
       {
         className: "dshps-menu",
+        ref: menuRef,
         role: "menu",
         "aria-label": t("menuTitle"),
         style: { top: `${anchor.top}px`, left: `${anchor.left}px` }
@@ -552,6 +611,7 @@ function createModeButton(ctx, reactModule) {
       reactModule.createElement("div", { className: "dshps-menu-head" }, t("menuTitle")),
       roster.status === "loading" && reactModule.createElement("div", { className: "dshps-note" }, t("loading")),
       roster.status === "error" && reactModule.createElement("div", { className: "dshps-note" }, t("loadFailed")),
+      roster.status === "error" && roster.error !== null && reactModule.createElement("div", { className: "dshps-error", role: "alert" }, roster.error),
       roster.status === "ready" && others.length === 0 && reactModule.createElement("div", { className: "dshps-note" }, t("empty")),
       others.map((preset) => reactModule.createElement(
         "button",
@@ -575,6 +635,7 @@ function createModeButton(ctx, reactModule) {
       "div",
       {
         className: "dshps-backdrop",
+        ref: dialogRef,
         onMouseDown: (event) => {
           if (event.target === event.currentTarget) setConfirm(null);
         }
@@ -657,9 +718,18 @@ function createModeButton(ctx, reactModule) {
         )
       )
     );
+    const mount = (node) => {
+      if (node === null) return null;
+      if (typeof document === "undefined" || reactDom === void 0) return node;
+      return reactDom.createPortal(node, document.body);
+    };
     return reactModule.createElement(
       "span",
-      { className: "dshps-root", ref: rootRef },
+      {
+        className: "dshps-root",
+        ref: rootRef,
+        "data-revealed": revealed || open || confirm !== null
+      },
       reactModule.createElement("style", null, STYLES),
       reactModule.createElement(
         "button",
@@ -692,8 +762,8 @@ function createModeButton(ctx, reactModule) {
           })
         )
       ),
-      menu,
-      dialog
+      mount(menu),
+      mount(dialog)
     );
   };
 }

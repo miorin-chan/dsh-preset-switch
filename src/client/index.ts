@@ -271,16 +271,28 @@ const LABELS: Record<BuiltInLocaleId, Record<LabelKey, string>> & Record<LocaleI
  * page's private primitives.
  */
 const STYLES = `
-.dshps-root { position: relative; display: inline-flex; align-items: center; }
+.dshps-root {
+  position: relative; display: inline-flex; align-items: center; flex: none;
+  height: 24px; width: 0; overflow: clip;
+  transition: width 160ms ease, margin-inline-start 160ms ease;
+}
+.dshps-root[data-revealed='true'] { width: 22px; margin-inline-start: 2px; }
 .dshps-trigger {
   display: inline-flex; align-items: center; justify-content: center;
-  width: 22px; height: 22px; padding: 0; margin-left: 2px;
+  width: 22px; height: 22px; padding: 0;
   border: none; border-radius: var(--dsw-radius-xs);
   background: var(--dsw-alias-fill-tsp-secondary);
   color: var(--dsw-alias-label-tertiary); cursor: pointer;
+  opacity: 0; transform: translateX(-8px); pointer-events: none;
+  transition: opacity 120ms ease, transform 160ms ease, background-color 120ms ease, color 120ms ease;
 }
+.dshps-root[data-revealed='true'] .dshps-trigger { opacity: 1; transform: none; pointer-events: auto; }
 @media (hover: hover) {
   .dshps-trigger:hover { background: var(--dsw-alias-interactive-bg-hover); color: var(--dsw-alias-label-primary); }
+}
+@media (hover: none) {
+  .dshps-root { width: 22px; margin-inline-start: 2px; }
+  .dshps-trigger { opacity: 1; transform: none; pointer-events: auto; }
 }
 .dshps-trigger:focus-visible { outline: 2px solid var(--dsw-alias-border-selected); outline-offset: 1px; }
 .dshps-trigger:disabled { cursor: default; color: var(--dsw-alias-label-quaternary); }
@@ -387,7 +399,7 @@ interface MenuAnchor {
  * table; a page build without it throws, which the probe catches.
  */
 interface ModuleLoaderRequire {
-  (id: 'react'): unknown
+  (id: 'react' | 'react-dom'): unknown
 }
 
 declare const require: ModuleLoaderRequire
@@ -563,6 +575,29 @@ function loadReact(): ReactModule | undefined {
 
 const react = loadReact()
 
+/** The static `react-dom` module's portal factory, narrowed to what this module calls. */
+interface ReactDomModule {
+  readonly createPortal: (children: React.ReactNode, container: Element) => React.ReactNode
+}
+
+/**
+ * Read the shared `react-dom` module for `createPortal`. The header clips its
+ * layout, so the menu and dialog mount on `document.body` instead of inheriting
+ * that box.
+ * @returns the portal factory, or undefined when the page does not seed it.
+ */
+function loadReactDom(): ReactDomModule | undefined {
+  try {
+    const loaded: unknown = require('react-dom')
+    if (typeof loaded !== 'object' || loaded === null || !('createPortal' in loaded)) return undefined
+    return typeof loaded.createPortal === 'function' ? loaded as ReactDomModule : undefined
+  } catch {
+    return undefined
+  }
+}
+
+const reactDom = loadReactDom()
+
 /**
  * Read one preset's declared composition.
  * @param ctx - Client context.
@@ -588,6 +623,7 @@ function createModeButton(ctx: ClientContext, reactModule: ReactModule) {
     const currentPresetId = current === null ? undefined : current
 
     const [open, setOpen] = reactModule.useState(false)
+    const [revealed, setRevealed] = reactModule.useState(false)
     const [anchor, setAnchor] = reactModule.useState<MenuAnchor | null>(null)
     const [roster, setRoster] = reactModule.useState<RosterState>({ status: 'loading', presets: [], error: null })
     const [busy, setBusy] = reactModule.useState(false)
@@ -595,10 +631,17 @@ function createModeButton(ctx: ClientContext, reactModule: ReactModule) {
     const [confirm, setConfirm] = reactModule.useState<ConfirmState | null>(null)
     const rootRef = reactModule.useRef<HTMLSpanElement>(null)
     const triggerRef = reactModule.useRef<HTMLButtonElement>(null)
+    const menuRef = reactModule.useRef<HTMLDivElement>(null)
+    const dialogRef = reactModule.useRef<HTMLDivElement>(null)
     const cancelRef = reactModule.useRef<HTMLButtonElement>(null)
 
     reactModule.useEffect(() => {
+      // Read the roster each time the menu opens: the first attempt may have
+      // raced the Remote namespace, and a shipped preset can appear or break
+      // while the conversation stays open.
+      if (!open) return undefined
       let alive = true
+      setRoster(state => ({ status: 'loading', presets: state.presets, error: null }))
       ctx.remote.agentPresets.list().then((result) => {
         if (!alive) return
         if (!result.ok) {
@@ -618,14 +661,49 @@ function createModeButton(ctx: ClientContext, reactModule: ReactModule) {
         if (alive) setRoster({ status: 'error', presets: [], error: failure instanceof Error ? failure.message : String(failure) })
       })
       return () => { alive = false }
+    }, [open])
+
+    // The chevron rests collapsed. Hovering the conversation header — which
+    // holds the shipped mode label — slides it out, and keyboard focus does
+    // the same. Devices without hover keep it permanently visible.
+    reactModule.useEffect(() => {
+      const root = rootRef.current
+      const host = root?.closest('header') ?? root?.parentElement
+      if (host === null || host === undefined) return undefined
+      const hoverCapable = typeof window.matchMedia === 'function'
+        ? window.matchMedia('(hover: hover)').matches
+        : true
+      if (!hoverCapable) {
+        setRevealed(true)
+        return undefined
+      }
+      const show = (): void => { setRevealed(true) }
+      const hide = (): void => { setRevealed(false) }
+      const focusOut = (event: FocusEvent): void => {
+        const next = event.relatedTarget
+        if (!(next instanceof Node) || !host.contains(next)) setRevealed(false)
+      }
+      host.addEventListener('pointerenter', show)
+      host.addEventListener('pointerleave', hide)
+      host.addEventListener('focusin', show)
+      host.addEventListener('focusout', focusOut)
+      return () => {
+        host.removeEventListener('pointerenter', show)
+        host.removeEventListener('pointerleave', hide)
+        host.removeEventListener('focusin', show)
+        host.removeEventListener('focusout', focusOut)
+      }
     }, [])
 
     reactModule.useEffect(() => {
       if (!open) return undefined
       const onPointer = (event: PointerEvent): void => {
-        const root = rootRef.current
         const target = event.target
-        if (root !== null && target instanceof Node && !root.contains(target)) setOpen(false)
+        if (!(target instanceof Node)) return
+        const inside = rootRef.current?.contains(target) === true
+          || menuRef.current?.contains(target) === true
+          || dialogRef.current?.contains(target) === true
+        if (!inside) setOpen(false)
       }
       const onKey = (event: KeyboardEvent): void => {
         if (event.key !== 'Escape') return
@@ -740,6 +818,7 @@ function createModeButton(ctx: ClientContext, reactModule: ReactModule) {
     const menu = open && anchor !== null
       ? reactModule.createElement('div', {
         className: 'dshps-menu',
+        ref: menuRef,
         role: 'menu',
         'aria-label': t('menuTitle'),
         style: { top: `${anchor.top}px`, left: `${anchor.left}px` },
@@ -747,6 +826,7 @@ function createModeButton(ctx: ClientContext, reactModule: ReactModule) {
       reactModule.createElement('div', { className: 'dshps-menu-head' }, t('menuTitle')),
       roster.status === 'loading' && reactModule.createElement('div', { className: 'dshps-note' }, t('loading')),
       roster.status === 'error' && reactModule.createElement('div', { className: 'dshps-note' }, t('loadFailed')),
+      roster.status === 'error' && roster.error !== null && reactModule.createElement('div', { className: 'dshps-error', role: 'alert' }, roster.error),
       roster.status === 'ready' && others.length === 0 && reactModule.createElement('div', { className: 'dshps-note' }, t('empty')),
       others.map(preset => reactModule.createElement('button', {
         key: preset.id,
@@ -766,6 +846,7 @@ function createModeButton(ctx: ClientContext, reactModule: ReactModule) {
       ? null
       : reactModule.createElement('div', {
         className: 'dshps-backdrop',
+        ref: dialogRef,
         onMouseDown: (event: React.MouseEvent<HTMLDivElement>) => {
           if (event.target === event.currentTarget) setConfirm(null)
         },
@@ -817,7 +898,20 @@ function createModeButton(ctx: ClientContext, reactModule: ReactModule) {
           onClick: () => { void apply() },
         }, busy ? t('switching') : t('confirmApply')))))
 
-    return reactModule.createElement('span', { className: 'dshps-root', ref: rootRef },
+    // The header animates and clips its actions row, so a `position: fixed`
+    // child is still at the mercy of an ancestor transform. Mounting the
+    // popups on `document.body` keeps them outside that box entirely.
+    const mount = (node: React.ReactNode): React.ReactNode => {
+      if (node === null) return null
+      if (typeof document === 'undefined' || reactDom === undefined) return node
+      return reactDom.createPortal(node, document.body)
+    }
+
+    return reactModule.createElement('span', {
+      className: 'dshps-root',
+      ref: rootRef,
+      'data-revealed': revealed || open || confirm !== null,
+    },
       reactModule.createElement('style', null, STYLES),
       reactModule.createElement('button', {
         ref: triggerRef,
@@ -844,8 +938,8 @@ function createModeButton(ctx: ClientContext, reactModule: ReactModule) {
         strokeLinecap: 'round',
         strokeLinejoin: 'round',
       }))),
-      menu,
-      dialog)
+      mount(menu),
+      mount(dialog))
   }
 }
 

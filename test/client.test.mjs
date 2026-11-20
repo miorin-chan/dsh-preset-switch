@@ -179,6 +179,7 @@ test('renders the header chevron only when the session records a preset', () => 
 
   const tree = Component({ sessionId: 'session-1', t: key => key, useSessions: () => 'standard' })
   assert.equal(tree.type, 'span')
+  assert.equal(tree.props['data-revealed'], false, 'the chevron rests collapsed until the header is hovered')
   const trigger = tree.children.find(child => child !== null && child.props?.className === 'dshps-trigger')
   assert.ok(trigger, 'the chevron button renders beside the shipped label')
   assert.equal(trigger.props['aria-haspopup'], 'menu')

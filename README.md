@@ -23,7 +23,7 @@ Disable it in **Plugins** to unload it.
 ## Use
 
 1. Open a session that already has a preset recorded.
-2. Click the chevron beside the preset name in the header.
+2. Hover the header to slide out the chevron beside the preset name, then click it.
 3. Pick a mode. A purely additive switch happens at once; a switch that removes
    or disables plugins first shows what it would take away.
 
