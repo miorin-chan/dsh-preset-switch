@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased
+
+- Localize the `/preset-switch` description, argument hint, usage, and results in eight languages.
+  The command follows the saved language preference, with English as the fallback.
+
 ## 0.1.0
 
 - Add the session-header chevron that opens the Agent-mode picker for an idle session.

@@ -45,7 +45,8 @@ Check whether new behavior belongs in its own bundle.
 - The Client half names its own services in a local interface because one tsconfig compiles both halves:
   the Host and Client assemblies declare different `sessions` faces on the Cordis Context.
   Do not read that merged `ctx.sessions` in the browser source.
-- Keep Plugin Manager metadata in `locale/*.json` and runtime translations in `LABELS` in the browser source.
+- Keep Plugin Manager metadata in `locale/*.json`, picker translations in `LABELS` in the browser source,
+  and slash-command translations in `src/host/locale.ts`.
 - [test/client.test.mjs](test/client.test.mjs) uses a fake `ctx` to check registration and cleanup,
   and checks the row parser and additive/removal/disable classification.
 - [test/command.test.mjs](test/command.test.mjs) covers idle/compaction refusals, the no-op case,

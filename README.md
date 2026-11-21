@@ -27,7 +27,9 @@ Disable it in **Plugins** to unload it.
 3. Pick a mode. A purely additive switch happens at once; a switch that removes
    or disables plugins first shows what it would take away.
 
-The same switch is available as `/preset-switch <preset-id>`.
+The same switch is available as `/preset-switch <preset-id>`, for example `/preset-switch standard`.
+The command follows the language selected in **Settings**.
+With automatic browser language selection, it uses English.
 
 ## Limits
 

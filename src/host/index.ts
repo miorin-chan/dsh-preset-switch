@@ -29,11 +29,28 @@ import type { AgentPreset } from '@deepseek-ai/dsh-agent-preset-registry'
 import type { CommandInvocation, CommandResult } from '@deepseek-ai/dsh-commands'
 import type {} from '@deepseek-ai/dsh-compaction/types'
 import type { Session, SessionId, SessionSeq } from '@deepseek-ai/dsh-session'
+import type {} from '@deepseek-ai/dsh-settings'
+import { commandMessages, type CommandMessages } from './locale.js'
 
 export const name = 'preset-switch'
 export const inject = ['commands', 'agentPresets', 'agents']
 
-const USAGE = 'Usage: /preset-switch <preset-id>'
+const LOCALE_ENTRY = 'locale'
+
+function readCommandMessages(ctx: Context): CommandMessages {
+  const settings = ctx.get('settings')
+  const value = settings?.describe({ redactSecrets: true }).find(section => section.ns === LOCALE_ENTRY)?.value
+  const preference = typeof value === 'object' && value !== null && 'preference' in value ? value.preference : undefined
+  return commandMessages(preference)
+}
+
+function switchFailure(ctx: Context, messages: CommandMessages, target: string, error: unknown): CommandResult {
+  if (error instanceof Error && 'code' in error && error.code === 'agent-preset/not-found') {
+    return { kind: 'error', text: messages.notFound(target) }
+  }
+  ctx.logger.warn('preset-switch: could not switch to %s: %s', target, error)
+  return { kind: 'error', text: messages.failed(target) }
+}
 
 /** The last standalone compaction bracket marker found while walking the log backwards. */
 interface CompactionMarker {
@@ -90,56 +107,46 @@ function compactionActive(session: Session): boolean {
  * @param ctx - Host plugin context.
  * @param agent - Session Agent receiving the command.
  * @param target - Requested preset id.
+ * @param messages - Command language captured at invocation.
  * @returns the command result rendered by the dispatching UI.
  */
-async function switchPreset(ctx: Context, agent: Agent, target: string): Promise<CommandResult> {
+async function switchPreset(ctx: Context, agent: Agent, target: string, messages: CommandMessages): Promise<CommandResult> {
   const boundary = ctx.agents.turnBoundaryOf(agent.session)
   if (boundary.openTurnStartSeq !== null) {
-    return {
-      kind: 'error',
-      text: 'This session is running a turn. Wait for it to finish, then switch modes.',
-    }
+    return { kind: 'error', text: messages.running }
   }
   if (compactionActive(agent.session)) {
-    return {
-      kind: 'error',
-      text: 'This session is compacting its history. Wait for compaction to finish, then switch modes.',
-    }
+    return { kind: 'error', text: messages.compacting }
   }
 
   let resolved: AgentPreset
   try {
     resolved = await ctx.agentPresets.resolve(target)
   } catch (error) {
-    return { kind: 'error', text: `Cannot switch to "${target}": ${error instanceof Error ? error.message : String(error)}` }
+    return switchFailure(ctx, messages, target, error)
   }
   if (resolved.broken !== undefined) {
-    return { kind: 'error', text: `Cannot switch to "${target}": ${resolved.broken}` }
+    ctx.logger.warn('preset-switch: preset %s is unavailable: %s', target, resolved.broken)
+    return { kind: 'error', text: messages.unavailable(target) }
   }
   if (ctx.agentPresets.composedPreset(agent.ctx) === resolved.id) {
-    return { kind: 'success', text: `This session already runs "${resolved.id}".` }
+    return { kind: 'success', text: messages.current(resolved.id) }
   }
 
   // Resolving awaits the activation audit; re-check the boundary so a turn
   // admitted during that window still refuses the swap.
   const settled = ctx.agents.turnBoundaryOf(agent.session)
   if (settled.openTurnStartSeq !== null || compactionActive(agent.session)) {
-    return {
-      kind: 'error',
-      text: 'The session became busy. Wait for the current work to finish, then switch modes.',
-    }
+    return { kind: 'error', text: messages.busy }
   }
 
   try {
     await ctx.agentPresets.recompose(agent.ctx, resolved.id)
   } catch (error) {
-    return { kind: 'error', text: `Cannot switch to "${target}": ${error instanceof Error ? error.message : String(error)}` }
+    return switchFailure(ctx, messages, target, error)
   }
   agent.session.append('agent-preset/selected', { agentPreset: resolved.id })
-  return {
-    kind: 'success',
-    text: `Switched this session to "${resolved.id}". Later turns use the new mode; earlier turns keep the tools they ran with.`,
-  }
+  return { kind: 'success', text: messages.switched(resolved.id) }
 }
 
 /**
@@ -148,22 +155,25 @@ async function switchPreset(ctx: Context, agent: Agent, target: string): Promise
  * @param ctx - Host plugin context.
  * @param switches - Per-Agent tail of the last switch attempt.
  * @param invocation - Admitted command invocation.
+ * @param messages - Command language captured at invocation.
  * @returns the settled command result.
  */
 async function handleCommand(
   ctx: Context,
   switches: Map<SessionId, Promise<CommandResult | undefined>>,
   invocation: CommandInvocation,
+  messages: CommandMessages,
 ): Promise<CommandResult> {
+  const usage = messages.usage(`/${name} ${messages.hint}`)
   if (invocation.attachments.length > 0) {
-    return { kind: 'error', text: `The switch command takes no attachments. ${USAGE}` }
+    return { kind: 'error', text: messages.noAttachments(usage) }
   }
   const target = invocation.rawInput.trim()
-  if (target === '' || /\s/.test(target)) return { kind: 'error', text: USAGE }
+  if (target === '' || /\s/.test(target)) return { kind: 'error', text: usage }
 
   const agent = invocation.agent
   const previous = switches.get(agent.id) ?? Promise.resolve()
-  const attempt = previous.then(() => switchPreset(ctx, agent, target))
+  const attempt = previous.then(() => switchPreset(ctx, agent, target, messages))
   const guard = attempt.catch(() => undefined)
   switches.set(agent.id, guard)
   try {
@@ -179,12 +189,36 @@ async function handleCommand(
  */
 export function apply(ctx: Context): void {
   const switches = new Map<SessionId, Promise<CommandResult | undefined>>()
-  ctx.effect(() => ctx.commands.register({
-    name: 'preset-switch',
-    description: 'Switch this session to another Agent preset while it is idle',
-    input: { hint: '<preset-id>' },
-    // The committed `agent-preset/selected` event owns the authoritative input.
-    recordInput: false,
-    handler: invocation => handleCommand(ctx, switches, invocation),
-  }), 'preset-switch: command')
+  ctx.effect(() => {
+    const register = (messages: CommandMessages) => ctx.commands.register({
+      name,
+      description: messages.description,
+      input: { hint: messages.hint },
+      // The committed `agent-preset/selected` event owns the authoritative input.
+      recordInput: false,
+      handler: invocation => handleCommand(ctx, switches, invocation, messages),
+    })
+
+    let messages = readCommandMessages(ctx)
+    let unregister = register(messages)
+    let disposed = false
+    const unlisten = ctx.on('settings/document-updated', ns => {
+      if (ns !== LOCALE_ENTRY) return
+      // Settings emits from inside describe(). Read after that pass has finished.
+      queueMicrotask(() => {
+        if (disposed) return
+        const next = readCommandMessages(ctx)
+        if (next === messages) return
+        unregister()
+        unregister = register(next)
+        messages = next
+      })
+    })
+
+    return () => {
+      disposed = true
+      unlisten()
+      unregister()
+    }
+  }, 'preset-switch: localized command')
 }
