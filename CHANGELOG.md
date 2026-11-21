@@ -24,3 +24,5 @@
   before a row's click runs.
 - Cancel the header actions strip's 10px gap around the resting slot and reveal the chevron 4px after the preset pill,
   matching the Workspace label's ellipsis spacing.
+- Redraw the bundle icon from DSH's `agent-preset` glyph: three presets on a ring,
+  with an arrow sweeping into the teal active preset, in the official plugin-icon palette.
