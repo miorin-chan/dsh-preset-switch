@@ -270,36 +270,42 @@ const LABELS: Record<BuiltInLocaleId, Record<LabelKey, string>> & Record<LocaleI
  * the control follows light and dark appearance without importing the
  * page's private primitives.
  */
+// The header slot renders the shipped AgentPresetLabel and this entry as siblings.
+// The label has no public DOM marker. If its CSS module class changes, keep the
+// switch visible so the picker still has a pointer-accessible entry point.
+const PRESET_LABEL = '.nIjNjW_label'
+
 const STYLES = `
 .dshps-root {
-  /* The actions strip spaces its items by 10px. A zero-width entry would add
-     a second gap around itself, so the resting end margin cancels one; the
-     revealed start margin then leaves 4px between the preset pill and the
-     button, the same gap the Workspace label puts before its ellipsis. */
+  /* Cancel the strip's 10px gap before this entry. The revealed root starts
+     flush with the label, so its 4px inset is part of the hover target. */
   position: relative; display: inline-flex; align-items: center; flex: none;
-  height: 24px; width: 0; overflow: clip;
-  margin-inline-start: 0; margin-inline-end: -10px;
-  transition: width 160ms ease, margin-inline-start 160ms ease, margin-inline-end 160ms ease;
+  height: 24px; width: calc(26px * var(--dshps-revealed, 0)); overflow: clip;
+  margin-inline-start: -10px;
+  transition: width 160ms ease;
 }
-.dshps-root[data-revealed='true'] { width: 22px; margin-inline-start: -6px; margin-inline-end: 0; }
+.dshps-root:is([data-open='true'], :has(.dshps-trigger:focus-visible)),
+.dshps-root:not(${PRESET_LABEL} + .dshps-root) {
+  --dshps-revealed: 1;
+}
 .dshps-trigger {
-  display: inline-flex; align-items: center; justify-content: center;
-  width: 22px; height: 22px; padding: 0;
+  display: inline-flex; align-items: center; justify-content: center; flex: none;
+  width: 22px; height: 22px; padding: 0; margin-inline-start: 4px;
   border: none; border-radius: var(--dsw-radius-xs);
   background: var(--dsw-alias-fill-tsp-secondary);
   color: var(--dsw-alias-label-tertiary); cursor: pointer;
-  opacity: 0; transform: translateX(-8px); pointer-events: none;
-  transition: opacity 120ms ease, transform 160ms ease, background-color 120ms ease, color 120ms ease;
+  opacity: var(--dshps-revealed, 0);
+  transition: opacity 120ms ease, background-color 120ms ease, color 120ms ease;
 }
-.dshps-root[data-revealed='true'] .dshps-trigger { opacity: 1; transform: none; pointer-events: auto; }
 @media (hover: hover) {
+  ${PRESET_LABEL}:hover + .dshps-root,
+  .dshps-root:hover { --dshps-revealed: 1; }
   .dshps-trigger:hover { background: var(--dsw-alias-interactive-bg-hover); color: var(--dsw-alias-label-primary); }
 }
 @media (hover: none) {
-  .dshps-root { width: 22px; margin-inline-start: -6px; margin-inline-end: 0; }
-  .dshps-trigger { opacity: 1; transform: none; pointer-events: auto; }
+  .dshps-root { --dshps-revealed: 1; }
 }
-.dshps-trigger:focus-visible { outline: 2px solid var(--dsw-alias-border-selected); outline-offset: 1px; }
+.dshps-trigger:focus-visible { outline: 2px solid var(--dsw-alias-border-selected); outline-offset: -2px; }
 .dshps-trigger:disabled { cursor: default; color: var(--dsw-alias-label-quaternary); }
 .dshps-trigger[aria-expanded='true'] { background: var(--dsw-alias-interactive-bg-hover); color: var(--dsw-alias-label-primary); }
 .dshps-menu {
@@ -628,7 +634,6 @@ function createModeButton(ctx: ClientContext, reactModule: ReactModule) {
     const currentPresetId = current === null ? undefined : current
 
     const [open, setOpen] = reactModule.useState(false)
-    const [revealed, setRevealed] = reactModule.useState(false)
     const [anchor, setAnchor] = reactModule.useState<MenuAnchor | null>(null)
     const [roster, setRoster] = reactModule.useState<RosterState>({ status: 'loading', presets: [], error: null })
     const [busy, setBusy] = reactModule.useState(false)
@@ -667,38 +672,6 @@ function createModeButton(ctx: ClientContext, reactModule: ReactModule) {
       })
       return () => { alive = false }
     }, [open])
-
-    // The chevron rests collapsed. Hovering the conversation header — which
-    // holds the shipped mode label — slides it out, and keyboard focus does
-    // the same. Devices without hover keep it permanently visible.
-    reactModule.useEffect(() => {
-      const root = rootRef.current
-      const host = root?.closest('header') ?? root?.parentElement
-      if (host === null || host === undefined) return undefined
-      const hoverCapable = typeof window.matchMedia === 'function'
-        ? window.matchMedia('(hover: hover)').matches
-        : true
-      if (!hoverCapable) {
-        setRevealed(true)
-        return undefined
-      }
-      const show = (): void => { setRevealed(true) }
-      const hide = (): void => { setRevealed(false) }
-      const focusOut = (event: FocusEvent): void => {
-        const next = event.relatedTarget
-        if (!(next instanceof Node) || !host.contains(next)) setRevealed(false)
-      }
-      host.addEventListener('pointerenter', show)
-      host.addEventListener('pointerleave', hide)
-      host.addEventListener('focusin', show)
-      host.addEventListener('focusout', focusOut)
-      return () => {
-        host.removeEventListener('pointerenter', show)
-        host.removeEventListener('pointerleave', hide)
-        host.removeEventListener('focusin', show)
-        host.removeEventListener('focusout', focusOut)
-      }
-    }, [])
 
     reactModule.useEffect(() => {
       if (!open) return undefined
@@ -915,7 +888,7 @@ function createModeButton(ctx: ClientContext, reactModule: ReactModule) {
     return reactModule.createElement('span', {
       className: 'dshps-root',
       ref: rootRef,
-      'data-revealed': revealed || open || confirm !== null,
+      'data-open': open || confirm !== null,
     },
       reactModule.createElement('style', null, STYLES),
       reactModule.createElement('button', {

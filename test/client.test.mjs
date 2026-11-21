@@ -179,11 +179,24 @@ test('renders the header chevron only when the session records a preset', () => 
 
   const tree = Component({ sessionId: 'session-1', t: key => key, useSessions: () => 'standard' })
   assert.equal(tree.type, 'span')
-  assert.equal(tree.props['data-revealed'], false, 'the chevron rests collapsed until the header is hovered')
+  assert.equal(tree.props['data-open'], false, 'the picker starts closed')
   const trigger = tree.children.find(child => child !== null && child.props?.className === 'dshps-trigger')
   assert.ok(trigger, 'the chevron button renders beside the shipped label')
   assert.equal(trigger.props['aria-haspopup'], 'menu')
   assert.equal(trigger.props['aria-expanded'], false)
+})
+
+test('scopes pointer reveal to the adjacent preset label and chevron', () => {
+  const { ctx, slots } = fakeContext()
+  plugin.apply(ctx)
+  const tree = slots[0].component({ sessionId: 'session-1', t: key => key, useSessions: () => 'standard' })
+  const [styles] = tree.children.find(child => child?.type === 'style').children
+  const [hoverRules] = styles.split('@media (hover: hover) {')[1].split('@media (hover: none) {')
+  const revealRule = hoverRules.match(/([^{}]+)\{ --dshps-revealed: 1; \}/)
+  assert.deepEqual(revealRule?.[1].split(',').map(selector => selector.trim()), [
+    '.nIjNjW_label:hover + .dshps-root',
+    '.dshps-root:hover',
+  ])
 })
 
 test('renders nothing when the preset projection is null', () => {
