@@ -30,9 +30,9 @@ import type { CommandInvocation, CommandResult } from '@deepseek-ai/dsh-commands
 import type {} from '@deepseek-ai/dsh-compaction/types'
 import type { Session, SessionId, SessionSeq } from '@deepseek-ai/dsh-session'
 import type {} from '@deepseek-ai/dsh-settings'
-import { commandMessages, type CommandMessages } from './locale.js'
+import { COMMAND_NAME, commandMessages, type CommandMessages } from '../command-locale.js'
 
-export const name = 'preset-switch'
+export const name = COMMAND_NAME
 export const inject = ['commands', 'agentPresets', 'agents']
 
 const LOCALE_ENTRY = 'locale'

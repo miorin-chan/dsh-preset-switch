@@ -29,8 +29,10 @@ Disable it in **Plugins** to unload it.
    or disables plugins first shows what it would take away.
 
 The same switch is available as `/preset-switch <preset-id>`, for example `/preset-switch standard`.
-The command follows the language selected in **Settings**.
-With automatic browser language selection, it uses English.
+Typing `/` in the Web composer also offers a localized spelling, such as `/切换预设 standard` in Chinese.
+You can type any supported spelling directly.
+Conversation history records the command as `preset-switch`.
+Command results follow the language selected in **Settings** and fall back to English with automatic language selection.
 
 ## Limits
 

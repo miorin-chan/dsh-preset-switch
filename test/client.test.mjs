@@ -32,6 +32,7 @@ function fakeContext() {
   const effects = []
   const registered = new Map()
   const slots = []
+  const sources = []
   const ctx = {
     effect(install, label) {
       const dispose = install()
@@ -47,6 +48,13 @@ function fakeContext() {
       },
       bind() {
         return key => key
+      },
+      getLocale: () => ({ active: 'en' }),
+    },
+    inputTriggers: {
+      registerSource(source) {
+        sources.push(source)
+        return () => { sources.length = 0 }
       },
     },
     slots: {
@@ -66,21 +74,22 @@ function fakeContext() {
         read: async () => ({ ok: true, value: { content: '' } }),
       },
     },
-    sessions: { binding: () => undefined },
+    sessions: { binding: () => undefined, subagentAddress: () => undefined },
   }
-  return { ctx, effects, registered, slots }
+  return { ctx, effects, registered, slots, sources }
 }
 
 test('declares the services it injects', () => {
   // `remote` alone gives the namespace table; each namespace is its own service.
-  assert.deepEqual(plugin.inject, ['locale', 'slots', 'sessions', 'remote', 'remote.agentPresets'])
+  assert.deepEqual(plugin.inject, ['locale', 'slots', 'sessions', 'inputTriggers', 'remote', 'remote.agentPresets'])
 })
 
-test('registers labels and the header action, then releases both', () => {
-  const { ctx, effects, registered, slots } = fakeContext()
+test('registers labels, the slash source, and the header action, then releases them', () => {
+  const { ctx, effects, registered, slots, sources } = fakeContext()
   plugin.apply(ctx)
 
-  assert.equal(effects.length, 2, 'locale and header registrations are effects')
+  assert.equal(effects.length, 3, 'locale, slash source, and header registrations are effects')
+  assert.equal(sources[0].trigger, '/')
   assert.ok(registered.has('dsh-preset-switch'), 'labels live under the plugin id')
   assert.equal(Object.keys(registered.get('dsh-preset-switch')).length, 8, 'every locale has labels')
   assert.equal(slots.length, 1, 'one header action')
@@ -93,6 +102,46 @@ test('registers labels and the header action, then releases both', () => {
   for (const effect of effects) effect.dispose()
   assert.equal(registered.has('dsh-preset-switch'), false, 'disposing removes the locale namespace')
   assert.equal(slots.length, 0, 'disposing removes the header action')
+  assert.equal(sources.length, 0, 'disposing removes the alias source')
+})
+
+test('the locale selects a menu spelling and every alias runs the canonical command', async () => {
+  const { ctx, sources } = fakeContext()
+  const submitted = []
+  const session = { sessionId: 'session-1' }
+  ctx.sessions.binding = () => ({ session: { command: async line => {
+    submitted.push(line)
+    return { ok: true, value: { matched: true } }
+  } } })
+  plugin.apply(ctx)
+  const [source] = sources
+  const signal = new AbortController().signal
+  const request = { query: '', position: 'leading', signal }
+  assert.deepEqual(await source.candidates(session, request), [], 'English uses the Host menu entry')
+  assert.equal(source.matchSpace(session, '/preset-switch'), undefined, 'the Host owns the canonical token')
+  for (const [active, token] of Object.entries({
+    zh: '切换预设', ja: 'プリセット切替', de: 'voreinstellung-wechseln', es: 'cambiar-preajuste',
+    fr: 'changer-préréglage', pt: 'mudar-predefinição', ru: 'сменить-предустановку',
+  })) {
+    ctx.locale.getLocale = () => ({ active })
+    const [candidate] = await source.candidates(session, { ...request, query: token.slice(0, 1) })
+    assert.equal(candidate.name, token)
+    const line = `/${token}`
+    const { claim } = source.onPick({ session, candidate, position: 'leading' })
+    assert.equal(claim.token, `${line} `)
+    assert.equal(claim.hint, candidate.hint)
+    assert.equal(source.matchSpace(session, line).claim.token, claim.token)
+    assert.equal((await source.matchEnter(session, `${line} standard`, signal, { attachments: 0 })).claim.name, 'preset-switch')
+    assert.deepEqual(await claim.submit('standard', ctx, []), { kind: 'success' })
+  }
+  assert.deepEqual(submitted, Array(7).fill('/preset-switch standard'))
+
+  ctx.locale.getLocale = () => ({ active: 'en' })
+  assert.equal((await source.matchClaim(session, '/切换预设', signal)).token, '/切换预设 ')
+  assert.equal(await source.matchEnter(session, '/切换预设其他 standard', signal, { attachments: 0 }), undefined)
+  await assert.rejects(() => source.matchEnter(session, '/切换预设 standard', signal, { attachments: 1 }), /no attachments/)
+  ctx.sessions.subagentAddress = () => ({})
+  assert.equal(await source.matchClaim(session, '/切换预设', signal), undefined)
 })
 
 /** A declaration with a group row, a conditional disable, and a config-only edit. */

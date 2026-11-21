@@ -39,8 +39,199 @@ __export(index_exports, {
   shortModule: () => shortModule
 });
 module.exports = __toCommonJS(index_exports);
+
+// src/command-locale.ts
+var COMMAND_NAME = "preset-switch";
+var english = {
+  token: COMMAND_NAME,
+  description: "Switch this session to another Agent preset while it is idle",
+  hint: "<preset-id>",
+  usage: (syntax) => `Usage: ${syntax}`,
+  noAttachments: (usage) => `The switch command takes no attachments. ${usage}`,
+  running: "This session is running a turn. Wait for it to finish, then switch modes.",
+  compacting: "This session is compacting its history. Wait for compaction to finish, then switch modes.",
+  busy: "The session became busy. Wait for the current work to finish, then switch modes.",
+  failed: (id) => `Could not switch to "${id}".`,
+  unavailable: (id) => `Agent preset "${id}" is unavailable.`,
+  notFound: (id) => `Unknown Agent preset: "${id}".`,
+  current: (id) => `This session already runs "${id}".`,
+  switched: (id) => `Switched this session to "${id}". Later turns use the new mode; earlier turns keep the tools they ran with.`
+};
+var messages = {
+  en: english,
+  zh: {
+    token: "\u5207\u6362\u9884\u8BBE",
+    description: "\u5728\u4F1A\u8BDD\u7A7A\u95F2\u65F6\u5207\u6362 Agent \u9884\u8BBE",
+    hint: "<\u9884\u8BBE ID>",
+    usage: (syntax) => `\u7528\u6CD5\uFF1A${syntax}`,
+    noAttachments: (usage) => `\u6B64\u547D\u4EE4\u4E0D\u63A5\u53D7\u9644\u4EF6\u3002${usage}`,
+    running: "\u4F1A\u8BDD\u6B63\u5728\u8FD0\u884C\u4E00\u4E2A\u56DE\u5408\u3002\u8BF7\u7B49\u5F53\u524D\u56DE\u5408\u7ED3\u675F\u540E\u518D\u5207\u6362\u6A21\u5F0F\u3002",
+    compacting: "\u4F1A\u8BDD\u6B63\u5728\u538B\u7F29\u5386\u53F2\u8BB0\u5F55\u3002\u8BF7\u7B49\u538B\u7F29\u5B8C\u6210\u540E\u518D\u5207\u6362\u6A21\u5F0F\u3002",
+    busy: "\u4F1A\u8BDD\u521A\u5F00\u59CB\u5904\u7406\u5176\u4ED6\u4EFB\u52A1\u3002\u8BF7\u7B49\u5F53\u524D\u4EFB\u52A1\u5B8C\u6210\u540E\u518D\u5207\u6362\u6A21\u5F0F\u3002",
+    failed: (id) => `\u65E0\u6CD5\u5207\u6362\u5230\u300C${id}\u300D\u3002`,
+    unavailable: (id) => `Agent \u9884\u8BBE\u300C${id}\u300D\u5F53\u524D\u4E0D\u53EF\u7528\u3002`,
+    notFound: (id) => `\u627E\u4E0D\u5230 Agent \u9884\u8BBE\u300C${id}\u300D\u3002`,
+    current: (id) => `\u6B64\u4F1A\u8BDD\u5DF2\u5728\u4F7F\u7528\u300C${id}\u300D\u3002`,
+    switched: (id) => `\u5DF2\u5C06\u6B64\u4F1A\u8BDD\u5207\u6362\u5230\u300C${id}\u300D\u3002\u540E\u7EED\u56DE\u5408\u5C06\u4F7F\u7528\u65B0\u6A21\u5F0F\uFF0C\u5DF2\u6709\u56DE\u5408\u4FDD\u7559\u5B83\u4EEC\u8FD0\u884C\u65F6\u7684\u5DE5\u5177\u3002`
+  },
+  ja: {
+    token: "\u30D7\u30EA\u30BB\u30C3\u30C8\u5207\u66FF",
+    description: "\u30BB\u30C3\u30B7\u30E7\u30F3\u304C\u5F85\u6A5F\u4E2D\u306B\u5225\u306E\u30A8\u30FC\u30B8\u30A7\u30F3\u30C8\u30D7\u30EA\u30BB\u30C3\u30C8\u306B\u5207\u308A\u66FF\u3048\u308B",
+    hint: "<\u30D7\u30EA\u30BB\u30C3\u30C8ID>",
+    usage: (syntax) => `\u4F7F\u3044\u65B9\uFF1A${syntax}`,
+    noAttachments: (usage) => `\u3053\u306E\u30B3\u30DE\u30F3\u30C9\u306B\u306F\u6DFB\u4ED8\u30D5\u30A1\u30A4\u30EB\u3092\u6307\u5B9A\u3067\u304D\u307E\u305B\u3093\u3002${usage}`,
+    running: "\u30BB\u30C3\u30B7\u30E7\u30F3\u3067\u30BF\u30FC\u30F3\u3092\u5B9F\u884C\u4E2D\u3067\u3059\u3002\u30BF\u30FC\u30F3\u304C\u7D42\u308F\u3063\u3066\u304B\u3089\u30E2\u30FC\u30C9\u3092\u5207\u308A\u66FF\u3048\u3066\u304F\u3060\u3055\u3044\u3002",
+    compacting: "\u30BB\u30C3\u30B7\u30E7\u30F3\u306E\u5C65\u6B74\u3092\u5727\u7E2E\u4E2D\u3067\u3059\u3002\u5727\u7E2E\u304C\u7D42\u308F\u3063\u3066\u304B\u3089\u30E2\u30FC\u30C9\u3092\u5207\u308A\u66FF\u3048\u3066\u304F\u3060\u3055\u3044\u3002",
+    busy: "\u30BB\u30C3\u30B7\u30E7\u30F3\u3067\u5225\u306E\u51E6\u7406\u304C\u59CB\u307E\u308A\u307E\u3057\u305F\u3002\u51E6\u7406\u304C\u7D42\u308F\u3063\u3066\u304B\u3089\u30E2\u30FC\u30C9\u3092\u5207\u308A\u66FF\u3048\u3066\u304F\u3060\u3055\u3044\u3002",
+    failed: (id) => `\u300C${id}\u300D\u306B\u5207\u308A\u66FF\u3048\u3089\u308C\u307E\u305B\u3093\u3067\u3057\u305F\u3002`,
+    unavailable: (id) => `\u30A8\u30FC\u30B8\u30A7\u30F3\u30C8\u30D7\u30EA\u30BB\u30C3\u30C8\u300C${id}\u300D\u306F\u73FE\u5728\u5229\u7528\u3067\u304D\u307E\u305B\u3093\u3002`,
+    notFound: (id) => `\u30A8\u30FC\u30B8\u30A7\u30F3\u30C8\u30D7\u30EA\u30BB\u30C3\u30C8\u300C${id}\u300D\u304C\u898B\u3064\u304B\u308A\u307E\u305B\u3093\u3002`,
+    current: (id) => `\u3053\u306E\u30BB\u30C3\u30B7\u30E7\u30F3\u306F\u3059\u3067\u306B\u300C${id}\u300D\u3092\u4F7F\u7528\u3057\u3066\u3044\u307E\u3059\u3002`,
+    switched: (id) => `\u3053\u306E\u30BB\u30C3\u30B7\u30E7\u30F3\u3092\u300C${id}\u300D\u306B\u5207\u308A\u66FF\u3048\u307E\u3057\u305F\u3002\u4EE5\u964D\u306E\u30BF\u30FC\u30F3\u3067\u306F\u65B0\u3057\u3044\u30E2\u30FC\u30C9\u3092\u4F7F\u7528\u3057\u3001\u4EE5\u524D\u306E\u30BF\u30FC\u30F3\u3067\u306F\u5B9F\u884C\u6642\u306E\u30C4\u30FC\u30EB\u304C\u4FDD\u6301\u3055\u308C\u307E\u3059\u3002`
+  },
+  de: {
+    token: "voreinstellung-wechseln",
+    description: "In einer inaktiven Sitzung zu einer anderen Agentenvoreinstellung wechseln",
+    hint: "<Voreinstellungs-ID>",
+    usage: (syntax) => `Verwendung: ${syntax}`,
+    noAttachments: (usage) => `Dieser Befehl akzeptiert keine Anh\xE4nge. ${usage}`,
+    running: "In dieser Sitzung l\xE4uft gerade ein Durchgang. Wechsle den Modus, sobald er abgeschlossen ist.",
+    compacting: "Der Sitzungsverlauf wird gerade komprimiert. Warte mit dem Moduswechsel, bis die Komprimierung abgeschlossen ist.",
+    busy: "Die Sitzung hat einen anderen Vorgang gestartet. Wechsle den Modus, sobald der Vorgang abgeschlossen ist.",
+    failed: (id) => `Wechsel zu \u201E${id}\u201C fehlgeschlagen.`,
+    unavailable: (id) => `Die Agentenvoreinstellung \u201E${id}\u201C ist derzeit nicht verf\xFCgbar.`,
+    notFound: (id) => `Die Agentenvoreinstellung \u201E${id}\u201C wurde nicht gefunden.`,
+    current: (id) => `Diese Sitzung verwendet bereits \u201E${id}\u201C.`,
+    switched: (id) => `Diese Sitzung verwendet jetzt \u201E${id}\u201C. Weitere Durchg\xE4nge verwenden den neuen Modus. Fr\xFChere Durchg\xE4nge behalten ihre urspr\xFCnglichen Werkzeuge.`
+  },
+  es: {
+    token: "cambiar-preajuste",
+    description: "Cambiar el preajuste del agente cuando la sesi\xF3n est\xE9 inactiva",
+    hint: "<ID-del-preajuste>",
+    usage: (syntax) => `Uso: ${syntax}`,
+    noAttachments: (usage) => `Este comando no admite archivos adjuntos. ${usage}`,
+    running: "Hay un turno en curso en esta sesi\xF3n. Espera a que termine para cambiar de modo.",
+    compacting: "Se est\xE1 compactando el historial de la sesi\xF3n. Espera a que termine para cambiar de modo.",
+    busy: "La sesi\xF3n ha iniciado otra tarea. Espera a que termine para cambiar de modo.",
+    failed: (id) => `No se pudo cambiar a \xAB${id}\xBB.`,
+    unavailable: (id) => `El preajuste del agente \xAB${id}\xBB no est\xE1 disponible.`,
+    notFound: (id) => `No se encontr\xF3 el preajuste del agente \xAB${id}\xBB.`,
+    current: (id) => `Esta sesi\xF3n ya usa \xAB${id}\xBB.`,
+    switched: (id) => `La sesi\xF3n ahora usa \xAB${id}\xBB. Los pr\xF3ximos turnos usar\xE1n el nuevo modo. Los anteriores conservan las herramientas con las que se ejecutaron.`
+  },
+  fr: {
+    token: "changer-pr\xE9r\xE9glage",
+    description: "Changer le pr\xE9r\xE9glage de l\u2019agent lorsque la session est inactive",
+    hint: "<ID-du-pr\xE9r\xE9glage>",
+    usage: (syntax) => `Utilisation : ${syntax}`,
+    noAttachments: (usage) => `Cette commande n\u2019accepte pas de pi\xE8ces jointes. ${usage}`,
+    running: "Un tour est en cours dans cette session. Attendez la fin du tour avant de changer de mode.",
+    compacting: "L\u2019historique de la session est en cours de compression. Attendez la fin de la compression avant de changer de mode.",
+    busy: "La session vient de d\xE9marrer une autre t\xE2che. Attendez la fin de la t\xE2che avant de changer de mode.",
+    failed: (id) => `Impossible de passer \xE0 \xAB ${id} \xBB.`,
+    unavailable: (id) => `Le pr\xE9r\xE9glage d\u2019agent \xAB ${id} \xBB est indisponible.`,
+    notFound: (id) => `Le pr\xE9r\xE9glage d\u2019agent \xAB ${id} \xBB est introuvable.`,
+    current: (id) => `Cette session utilise d\xE9j\xE0 \xAB ${id} \xBB.`,
+    switched: (id) => `Cette session utilise d\xE9sormais \xAB ${id} \xBB. Les prochains tours utiliseront le nouveau mode. Les tours pr\xE9c\xE9dents conservent leurs outils d\u2019origine.`
+  },
+  pt: {
+    token: "mudar-predefini\xE7\xE3o",
+    description: "Alterar a predefini\xE7\xE3o do agente quando a sess\xE3o estiver ociosa",
+    hint: "<ID-da-predefini\xE7\xE3o>",
+    usage: (syntax) => `Uso: ${syntax}`,
+    noAttachments: (usage) => `Este comando n\xE3o aceita anexos. ${usage}`,
+    running: "Esta sess\xE3o tem um turno em andamento. Aguarde o t\xE9rmino para mudar de modo.",
+    compacting: "O hist\xF3rico da sess\xE3o est\xE1 sendo compactado. Aguarde o t\xE9rmino da compacta\xE7\xE3o para mudar de modo.",
+    busy: "A sess\xE3o iniciou outra tarefa. Aguarde o t\xE9rmino para mudar de modo.",
+    failed: (id) => `N\xE3o foi poss\xEDvel mudar para \u201C${id}\u201D.`,
+    unavailable: (id) => `A predefini\xE7\xE3o do agente \u201C${id}\u201D n\xE3o est\xE1 dispon\xEDvel.`,
+    notFound: (id) => `A predefini\xE7\xE3o do agente \u201C${id}\u201D n\xE3o foi encontrada.`,
+    current: (id) => `Esta sess\xE3o j\xE1 usa \u201C${id}\u201D.`,
+    switched: (id) => `A sess\xE3o agora usa \u201C${id}\u201D. Os pr\xF3ximos turnos usar\xE3o o novo modo. Os anteriores mant\xEAm as ferramentas com que foram executados.`
+  },
+  ru: {
+    token: "\u0441\u043C\u0435\u043D\u0438\u0442\u044C-\u043F\u0440\u0435\u0434\u0443\u0441\u0442\u0430\u043D\u043E\u0432\u043A\u0443",
+    description: "\u0421\u043C\u0435\u043D\u0438\u0442\u044C \u043F\u0440\u0435\u0434\u0443\u0441\u0442\u0430\u043D\u043E\u0432\u043A\u0443 \u0430\u0433\u0435\u043D\u0442\u0430, \u043A\u043E\u0433\u0434\u0430 \u0441\u0435\u0430\u043D\u0441 \u0441\u0432\u043E\u0431\u043E\u0434\u0435\u043D",
+    hint: "<ID-\u043F\u0440\u0435\u0434\u0443\u0441\u0442\u0430\u043D\u043E\u0432\u043A\u0438>",
+    usage: (syntax) => `\u0418\u0441\u043F\u043E\u043B\u044C\u0437\u043E\u0432\u0430\u043D\u0438\u0435: ${syntax}`,
+    noAttachments: (usage) => `\u042D\u0442\u0430 \u043A\u043E\u043C\u0430\u043D\u0434\u0430 \u043D\u0435 \u043F\u0440\u0438\u043D\u0438\u043C\u0430\u0435\u0442 \u0432\u043B\u043E\u0436\u0435\u043D\u0438\u044F. ${usage}`,
+    running: "\u0412 \u044D\u0442\u043E\u043C \u0441\u0435\u0430\u043D\u0441\u0435 \u0432\u044B\u043F\u043E\u043B\u043D\u044F\u0435\u0442\u0441\u044F \u0445\u043E\u0434. \u0414\u043E\u0436\u0434\u0438\u0442\u0435\u0441\u044C \u0435\u0433\u043E \u0437\u0430\u0432\u0435\u0440\u0448\u0435\u043D\u0438\u044F, \u0447\u0442\u043E\u0431\u044B \u0441\u043C\u0435\u043D\u0438\u0442\u044C \u0440\u0435\u0436\u0438\u043C.",
+    compacting: "\u0418\u0441\u0442\u043E\u0440\u0438\u044F \u0441\u0435\u0430\u043D\u0441\u0430 \u0441\u0436\u0438\u043C\u0430\u0435\u0442\u0441\u044F. \u0414\u043E\u0436\u0434\u0438\u0442\u0435\u0441\u044C \u0437\u0430\u0432\u0435\u0440\u0448\u0435\u043D\u0438\u044F \u0441\u0436\u0430\u0442\u0438\u044F, \u0447\u0442\u043E\u0431\u044B \u0441\u043C\u0435\u043D\u0438\u0442\u044C \u0440\u0435\u0436\u0438\u043C.",
+    busy: "\u0412 \u0441\u0435\u0430\u043D\u0441\u0435 \u043D\u0430\u0447\u0430\u043B\u0430\u0441\u044C \u0434\u0440\u0443\u0433\u0430\u044F \u043E\u043F\u0435\u0440\u0430\u0446\u0438\u044F. \u0414\u043E\u0436\u0434\u0438\u0442\u0435\u0441\u044C \u0435\u0451 \u0437\u0430\u0432\u0435\u0440\u0448\u0435\u043D\u0438\u044F, \u0447\u0442\u043E\u0431\u044B \u0441\u043C\u0435\u043D\u0438\u0442\u044C \u0440\u0435\u0436\u0438\u043C.",
+    failed: (id) => `\u041D\u0435 \u0443\u0434\u0430\u043B\u043E\u0441\u044C \u043F\u0435\u0440\u0435\u043A\u043B\u044E\u0447\u0438\u0442\u044C\u0441\u044F \u043D\u0430 \xAB${id}\xBB.`,
+    unavailable: (id) => `\u041F\u0440\u0435\u0434\u0443\u0441\u0442\u0430\u043D\u043E\u0432\u043A\u0430 \u0430\u0433\u0435\u043D\u0442\u0430 \xAB${id}\xBB \u0441\u0435\u0439\u0447\u0430\u0441 \u043D\u0435\u0434\u043E\u0441\u0442\u0443\u043F\u043D\u0430.`,
+    notFound: (id) => `\u041F\u0440\u0435\u0434\u0443\u0441\u0442\u0430\u043D\u043E\u0432\u043A\u0430 \u0430\u0433\u0435\u043D\u0442\u0430 \xAB${id}\xBB \u043D\u0435 \u043D\u0430\u0439\u0434\u0435\u043D\u0430.`,
+    current: (id) => `\u0412 \u044D\u0442\u043E\u043C \u0441\u0435\u0430\u043D\u0441\u0435 \u0443\u0436\u0435 \u0438\u0441\u043F\u043E\u043B\u044C\u0437\u0443\u0435\u0442\u0441\u044F \xAB${id}\xBB.`,
+    switched: (id) => `\u0421\u0435\u0430\u043D\u0441 \u043F\u0435\u0440\u0435\u043A\u043B\u044E\u0447\u0451\u043D \u043D\u0430 \xAB${id}\xBB. \u0421\u043B\u0435\u0434\u0443\u044E\u0449\u0438\u0435 \u0445\u043E\u0434\u044B \u0431\u0443\u0434\u0443\u0442 \u0438\u0441\u043F\u043E\u043B\u044C\u0437\u043E\u0432\u0430\u0442\u044C \u043D\u043E\u0432\u044B\u0439 \u0440\u0435\u0436\u0438\u043C. \u0414\u043B\u044F \u043F\u0440\u0435\u0434\u044B\u0434\u0443\u0449\u0438\u0445 \u0445\u043E\u0434\u043E\u0432 \u0441\u043E\u0445\u0440\u0430\u043D\u044F\u0442\u0441\u044F \u0438\u0441\u0445\u043E\u0434\u043D\u044B\u0435 \u0438\u043D\u0441\u0442\u0440\u0443\u043C\u0435\u043D\u0442\u044B.`
+  }
+};
+var COMMAND_ALIASES = new Set(Object.values(messages).filter(({ token }) => token !== COMMAND_NAME).map(({ token }) => `/${token}`));
+function commandMessages(preference) {
+  const language = typeof preference === "string" ? preference.toLowerCase().split("-")[0] : void 0;
+  return language !== void 0 && Object.hasOwn(messages, language) ? messages[language] : english;
+}
+
+// src/client/command-alias.ts
+function presetSwitchAlias(locale, sessions) {
+  const labels = () => commandMessages(locale.getLocale().active);
+  const sessionOf = (id) => sessions.subagentAddress(id) === void 0 ? sessions.binding(id)?.session : void 0;
+  const claimFor = (id, token) => {
+    const messages2 = labels();
+    if (!COMMAND_ALIASES.has(token) || sessionOf(id) === void 0) return void 0;
+    return {
+      name: COMMAND_NAME,
+      token: `${token} `,
+      hint: messages2.hint,
+      async submit(args, _actx, attachments) {
+        if (attachments.length > 0) {
+          return { kind: "error", text: messages2.noAttachments(messages2.usage(`${token} ${messages2.hint}`)) };
+        }
+        const session = sessionOf(id);
+        const t = locale.bind("dsh-preset-switch");
+        if (session === void 0) return { kind: "error", text: t("errorNotReady") };
+        const result = await session.command(`/${COMMAND_NAME} ${args}`);
+        if (!result.ok) return { kind: "error", text: t("errorSwitch") };
+        return result.value.matched ? { kind: "success" } : { kind: "error", text: t("errorNoCommand") };
+      }
+    };
+  };
+  return {
+    trigger: "/",
+    name: "dsh-preset-switch",
+    showGroupTitle: false,
+    order: -1,
+    async candidates({ sessionId }, { query, position }) {
+      const messages2 = labels();
+      if (position !== "leading" || messages2.token === COMMAND_NAME || sessionOf(sessionId) === void 0 || !messages2.token.startsWith(query.toLowerCase())) return [];
+      return [{ name: messages2.token, description: messages2.description, hint: messages2.hint }];
+    },
+    onPick({ session: { sessionId }, candidate, position }) {
+      const claim = position === "leading" ? claimFor(sessionId, `/${candidate.name}`) : void 0;
+      return claim === void 0 ? void 0 : { claim };
+    },
+    matchSpace({ sessionId }, token) {
+      const claim = claimFor(sessionId, token);
+      return claim === void 0 ? void 0 : { claim };
+    },
+    async matchClaim({ sessionId }, token) {
+      return claimFor(sessionId, token);
+    },
+    async matchEnter({ sessionId }, line, _signal, envelope) {
+      const token = line.split(/\s/u, 1)[0] ?? "";
+      const claim = claimFor(sessionId, token);
+      if (claim === void 0) return void 0;
+      if (envelope.attachments > 0) {
+        const messages2 = labels();
+        throw new Error(messages2.noAttachments(messages2.usage(`${token} ${messages2.hint}`)));
+      }
+      return { claim };
+    }
+  };
+}
+
+// src/client/index.ts
 var NS = "dsh-preset-switch";
-var COMMAND = "/preset-switch ";
+var COMMAND = `/${COMMAND_NAME} `;
 var BUILTIN_TEXT_KEYS = {
   standard: ["presetStandardName", "presetStandardDescription"],
   ptc: ["presetPtcName", "presetPtcDescription"],
@@ -743,9 +934,10 @@ function createModeButton(ctx, reactModule) {
     );
   };
 }
-var inject = ["locale", "slots", "sessions", "remote", "remote.agentPresets"];
+var inject = ["locale", "slots", "sessions", "inputTriggers", "remote", "remote.agentPresets"];
 function apply(ctx) {
   ctx.effect(() => ctx.locale.register(NS, LABELS), `${NS}: locale`);
+  ctx.effect(() => ctx.inputTriggers.registerSource(presetSwitchAlias(ctx.locale, ctx.sessions)), `${NS}: command alias`);
   if (react === void 0) {
     warnMissingReact("the shared react module is unavailable; the header switch is disabled");
     return;

@@ -4,6 +4,7 @@
 
 - Localize the `/preset-switch` description, argument hint, usage, and results in eight languages.
   The command follows the saved language preference, with English as the fallback.
+- Offer localized command names in the typed slash menu, and accept them as alternatives to `/preset-switch`.
 
 ## 0.1.0
 

@@ -1,4 +1,7 @@
+export const COMMAND_NAME = 'preset-switch'
+
 const english = {
+  token: COMMAND_NAME,
   description: 'Switch this session to another Agent preset while it is idle',
   hint: '<preset-id>',
   usage: (syntax: string) => `Usage: ${syntax}`,
@@ -19,6 +22,7 @@ type CommandLocale = 'en' | 'zh' | 'ja' | 'de' | 'es' | 'fr' | 'pt' | 'ru'
 const messages: Record<CommandLocale, CommandMessages> = {
   en: english,
   zh: {
+    token: '切换预设',
     description: '在会话空闲时切换 Agent 预设',
     hint: '<预设 ID>',
     usage: syntax => `用法：${syntax}`,
@@ -33,6 +37,7 @@ const messages: Record<CommandLocale, CommandMessages> = {
     switched: id => `已将此会话切换到「${id}」。后续回合将使用新模式，已有回合保留它们运行时的工具。`,
   },
   ja: {
+    token: 'プリセット切替',
     description: 'セッションが待機中に別のエージェントプリセットに切り替える',
     hint: '<プリセットID>',
     usage: syntax => `使い方：${syntax}`,
@@ -47,6 +52,7 @@ const messages: Record<CommandLocale, CommandMessages> = {
     switched: id => `このセッションを「${id}」に切り替えました。以降のターンでは新しいモードを使用し、以前のターンでは実行時のツールが保持されます。`,
   },
   de: {
+    token: 'voreinstellung-wechseln',
     description: 'In einer inaktiven Sitzung zu einer anderen Agentenvoreinstellung wechseln',
     hint: '<Voreinstellungs-ID>',
     usage: syntax => `Verwendung: ${syntax}`,
@@ -61,6 +67,7 @@ const messages: Record<CommandLocale, CommandMessages> = {
     switched: id => `Diese Sitzung verwendet jetzt „${id}“. Weitere Durchgänge verwenden den neuen Modus. Frühere Durchgänge behalten ihre ursprünglichen Werkzeuge.`,
   },
   es: {
+    token: 'cambiar-preajuste',
     description: 'Cambiar el preajuste del agente cuando la sesión esté inactiva',
     hint: '<ID-del-preajuste>',
     usage: syntax => `Uso: ${syntax}`,
@@ -75,6 +82,7 @@ const messages: Record<CommandLocale, CommandMessages> = {
     switched: id => `La sesión ahora usa «${id}». Los próximos turnos usarán el nuevo modo. Los anteriores conservan las herramientas con las que se ejecutaron.`,
   },
   fr: {
+    token: 'changer-préréglage',
     description: 'Changer le préréglage de l’agent lorsque la session est inactive',
     hint: '<ID-du-préréglage>',
     usage: syntax => `Utilisation : ${syntax}`,
@@ -89,6 +97,7 @@ const messages: Record<CommandLocale, CommandMessages> = {
     switched: id => `Cette session utilise désormais « ${id} ». Les prochains tours utiliseront le nouveau mode. Les tours précédents conservent leurs outils d’origine.`,
   },
   pt: {
+    token: 'mudar-predefinição',
     description: 'Alterar a predefinição do agente quando a sessão estiver ociosa',
     hint: '<ID-da-predefinição>',
     usage: syntax => `Uso: ${syntax}`,
@@ -103,6 +112,7 @@ const messages: Record<CommandLocale, CommandMessages> = {
     switched: id => `A sessão agora usa “${id}”. Os próximos turnos usarão o novo modo. Os anteriores mantêm as ferramentas com que foram executados.`,
   },
   ru: {
+    token: 'сменить-предустановку',
     description: 'Сменить предустановку агента, когда сеанс свободен',
     hint: '<ID-предустановки>',
     usage: syntax => `Использование: ${syntax}`,
@@ -118,7 +128,11 @@ const messages: Record<CommandLocale, CommandMessages> = {
   },
 }
 
-/** Match a saved language or its base tag. The browser's automatic choice is not sent to the Host. */
+export const COMMAND_ALIASES: ReadonlySet<string> = new Set(Object.values(messages)
+  .filter(({ token }) => token !== COMMAND_NAME)
+  .map(({ token }) => `/${token}`))
+
+/** Match a language or its base tag, falling back to English. */
 export function commandMessages(preference: unknown): CommandMessages {
   const language = typeof preference === 'string' ? preference.toLowerCase().split('-')[0] : undefined
   return language !== undefined && Object.hasOwn(messages, language) ? messages[language as CommandLocale] : english

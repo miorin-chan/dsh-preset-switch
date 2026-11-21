@@ -38,6 +38,9 @@ import type { AgentPresetRow } from '@deepseek-ai/dsh-agent-preset-registry/type
 import type { ClientRemote } from '@deepseek-ai/dsh-api-remotes/client'
 import type { ISessions } from '@deepseek-ai/dsh-api-session-controller/client'
 import type { BuiltInLocaleId, LocaleId, LocaleRuntime } from '@deepseek-ai/dsh-client-locale/client'
+import type { InputTriggerServiceContract } from '@deepseek-ai/dsh-client-ui-input-trigger/client'
+import { COMMAND_NAME } from '../command-locale.js'
+import { presetSwitchAlias } from './command-alias.js'
 import type {} from '@deepseek-ai/dsh-client-ui-conversation/client'
 import type { SlotRegistry } from '@deepseek-ai/dsh-client-ui-renderer/client'
 import type {} from '@deepseek-ai/dsh-client-ui-session/client'
@@ -60,6 +63,7 @@ interface ClientContext {
   readonly locale: LocaleRuntime
   readonly slots: SlotRegistry
   readonly sessions: ISessions
+  readonly inputTriggers: InputTriggerServiceContract
   readonly remote: ClientRemote
   readonly effect: Context['effect']
 }
@@ -92,7 +96,7 @@ declare module '@deepseek-ai/dsh-client-ui-slots' {
 }
 
 const NS = 'dsh-preset-switch'
-const COMMAND = '/preset-switch '
+const COMMAND = `/${COMMAND_NAME} `
 /** Built-in presets publish no name; the shipped UI dictionary owns them. */
 const BUILTIN_TEXT_KEYS: Readonly<Partial<Record<string, readonly [nameKey: string, descriptionKey: string]>>> = {
   standard: ['presetStandardName', 'presetStandardDescription'],
@@ -925,10 +929,11 @@ function createModeButton(ctx: ClientContext, reactModule: ReactModule) {
 type ModeButtonProps = PropsRuntime<'conversation.session.header.actions'> & PropsLocale<typeof NS>
 
 /** Services this module needs before `apply` runs. */
-export const inject = ['locale', 'slots', 'sessions', 'remote', 'remote.agentPresets']
+export const inject = ['locale', 'slots', 'sessions', 'inputTriggers', 'remote', 'remote.agentPresets']
 
 export function apply(ctx: ClientContext): void {
   ctx.effect(() => ctx.locale.register(NS, LABELS), `${NS}: locale`)
+  ctx.effect(() => ctx.inputTriggers.registerSource(presetSwitchAlias(ctx.locale, ctx.sessions)), `${NS}: command alias`)
   if (react === undefined) {
     warnMissingReact('the shared react module is unavailable; the header switch is disabled')
     return
