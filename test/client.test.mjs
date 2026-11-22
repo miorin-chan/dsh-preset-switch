@@ -248,6 +248,15 @@ test('scopes pointer reveal to the adjacent preset label and chevron', () => {
   ])
 })
 
+test('uses the host primary button foreground in the confirmation dialog', () => {
+  const { ctx, slots } = fakeContext()
+  plugin.apply(ctx)
+  const tree = slots[0].component({ sessionId: 'session-1', t: key => key, useSessions: () => 'standard' })
+  const [styles] = tree.children.find(child => child?.type === 'style').children
+  const primaryButton = styles.match(/\.dshps-button-primary \{([^}]+)\}/)?.[1]
+  assert.match(primaryButton ?? '', /color:\s*var\(--dsw-alias-label-primary-foreground\)/)
+})
+
 test('renders nothing when the preset projection is null', () => {
   const { ctx, slots } = fakeContext()
   plugin.apply(ctx)

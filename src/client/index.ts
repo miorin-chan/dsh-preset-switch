@@ -279,6 +279,11 @@ const LABELS: Record<BuiltInLocaleId, Record<LabelKey, string>> & Record<LocaleI
 // switch visible so the picker still has a pointer-accessible entry point.
 const PRESET_LABEL = '.nIjNjW_label'
 
+const MENU_WIDTH = 320
+const MENU_GUTTER = 8
+
+// Surface, Button and Modal styling follows @deepseek-ai/dsh-client-ui-primitives
+// (DSH 0.2.2-rc.5, shipped dsh-web-frontend/dist/assets/index-CSAdOBx6.css).
 const STYLES = `
 .dshps-root {
   /* Cancel the strip's 10px gap before this entry. The revealed root starts
@@ -296,7 +301,7 @@ const STYLES = `
   display: inline-flex; align-items: center; justify-content: center; flex: none;
   width: 22px; height: 22px; padding: 0; margin-inline-start: 4px;
   border: none; border-radius: var(--dsw-radius-xs);
-  background: var(--dsw-alias-fill-tsp-secondary);
+  background: var(--dsw-alias-interactive-bg-hover);
   color: var(--dsw-alias-label-tertiary); cursor: pointer;
   opacity: var(--dshps-revealed, 0);
   transition: opacity 120ms ease, background-color 120ms ease, color 120ms ease;
@@ -309,56 +314,65 @@ const STYLES = `
 @media (hover: none) {
   .dshps-root { --dshps-revealed: 1; }
 }
+/* AgentPresetLabel.module.css hides the adjacent label at this container width. */
+@container (max-width: 540px) {
+  .dshps-root { --dshps-revealed: 1; margin-inline-start: 0; }
+}
 .dshps-trigger:focus-visible { outline: 2px solid var(--dsw-alias-border-selected); outline-offset: -2px; }
 .dshps-trigger:disabled { cursor: default; color: var(--dsw-alias-label-quaternary); }
 .dshps-trigger[aria-expanded='true'] { background: var(--dsw-alias-interactive-bg-hover); color: var(--dsw-alias-label-primary); }
 .dshps-menu {
-  position: fixed; z-index: 1000; width: 320px; max-height: min(60vh, 440px);
-  overflow: auto; padding: 6px; box-sizing: border-box;
-  border: 1px solid var(--dsw-alias-border-l2);
+  position: fixed; top: var(--dshps-menu-top); z-index: 1000;
+  left: clamp(${MENU_GUTTER}px, var(--dshps-menu-left), calc(100% - ${MENU_WIDTH + MENU_GUTTER}px));
+  width: min(${MENU_WIDTH}px, calc(100% - ${MENU_GUTTER * 2}px));
+  max-height: min(440px, calc(100dvh - var(--dshps-menu-top) - ${MENU_GUTTER}px));
+  overflow: auto; overscroll-behavior: contain; overflow-wrap: anywhere;
+  padding: 6px; box-sizing: border-box;
   border-radius: var(--dsw-radius-md);
-  background: var(--dsw-alias-bg-layer-2);
-  box-shadow: var(--dsw-shadow-lv2);
+  background: var(--dsw-menu-surface-fill, var(--dsw-alias-bg-layer-2));
+  backdrop-filter: var(--dsw-menu-backdrop-filter);
+  box-shadow: var(--dsw-elevation-panel, var(--dsw-shadow-lv2));
 }
-.dshps-menu-head { padding: 6px 10px 8px; font-size: 12px; line-height: 16px; color: var(--dsw-alias-label-caption); }
-.dshps-note { padding: 8px 10px; font-size: 13px; line-height: 18px; color: var(--dsw-alias-label-caption); }
-.dshps-error { margin: 6px 4px 2px; padding: 8px 10px; border-radius: var(--dsw-radius-sm); font-size: 12px; line-height: 17px; color: var(--dsw-alias-state-error-primary); background: var(--dsw-alias-fill-tsp-secondary); }
+.dshps-menu-head { padding: 6px 10px 8px; font-size: 12px; line-height: 16px; color: var(--dsw-alias-label-secondary); }
+.dshps-note { padding: 8px 10px; font-size: 13px; line-height: 18px; color: var(--dsw-alias-label-secondary); }
+.dshps-error { margin: 6px 4px 2px; padding: 8px 10px; border-radius: var(--dsw-radius-sm); font-size: 12px; line-height: 17px; color: var(--dsw-alias-state-error-primary); background: var(--dsw-alias-interactive-bg-hover-danger); }
 .dshps-item {
   display: flex; flex-direction: column; gap: 2px; width: 100%;
   padding: 8px 10px; border: none; border-radius: var(--dsw-radius-sm);
-  background: transparent; text-align: left; cursor: pointer;
+  background: transparent; font-family: inherit; text-align: start; cursor: pointer;
 }
 @media (hover: hover) { .dshps-item:hover:not(:disabled) { background: var(--dsw-alias-interactive-bg-hover); } }
 .dshps-item:focus-visible { outline: 2px solid var(--dsw-alias-border-selected); outline-offset: -2px; }
 .dshps-item:disabled { cursor: default; opacity: 0.6; }
-.dshps-item-name { display: flex; align-items: center; gap: 6px; font-size: 13px; line-height: 20px; color: var(--dsw-alias-label-primary); }
-.dshps-item-mark { font-size: 11px; line-height: 16px; color: var(--dsw-alias-label-caption); }
-.dshps-item-desc { font-size: 12px; line-height: 16px; color: var(--dsw-alias-label-caption); overflow: hidden; }
+.dshps-item-name { font-size: 13px; line-height: 20px; color: var(--dsw-alias-label-primary); }
+.dshps-item-desc { font-size: 12px; line-height: 16px; color: var(--dsw-alias-label-secondary); }
 .dshps-backdrop {
   position: fixed; inset: 0; z-index: 1100; display: flex; align-items: center; justify-content: center;
-  padding: 24px; background: var(--dsw-alias-bg-mask-1);
+  padding: clamp(8px, 5vmin, 24px); background: var(--dsw-alias-bg-mask-1);
 }
 .dshps-dialog {
-  width: min(440px, 100%); max-height: 80vh; overflow: auto; box-sizing: border-box;
-  padding: 20px; border: 1px solid var(--dsw-alias-border-l2); border-radius: var(--dsw-radius-md);
-  background: var(--dsw-alias-bg-layer-1); box-shadow: var(--dsw-shadow-lv3);
+  display: flex; flex-direction: column; width: min(440px, 100%); max-height: 100%;
+  overflow: hidden; box-sizing: border-box; border-radius: var(--dsw-radius-panel, var(--dsw-radius-lg));
+  background: var(--dsw-alias-bg-layer-2); box-shadow: var(--dsw-elevation-prominent, var(--dsw-shadow-lv3));
+  overflow-wrap: anywhere;
 }
-.dshps-dialog-title { margin: 0; font-size: 15px; line-height: 22px; font-weight: 600; color: var(--dsw-alias-label-primary); }
-.dshps-dialog-note { margin: 8px 0 0; font-size: 13px; line-height: 19px; color: var(--dsw-alias-label-secondary); }
+.dshps-dialog-content { min-height: 0; overflow: auto; overscroll-behavior: contain; padding: 22px 24px 0; }
+.dshps-dialog-title { margin: 0; font-size: 16px; line-height: 24px; font-weight: 500; color: var(--dsw-alias-label-primary); }
+.dshps-dialog-note { margin: 8px 0 0; font-size: 14px; line-height: 22px; color: var(--dsw-alias-label-secondary); }
 .dshps-section { margin-top: 14px; }
-.dshps-section-title { font-size: 12px; line-height: 16px; font-weight: 500; color: var(--dsw-alias-label-caption); }
+.dshps-section-title { font-size: 12px; line-height: 16px; font-weight: 500; color: var(--dsw-alias-label-secondary); }
 .dshps-chips { display: flex; flex-wrap: wrap; gap: 6px; margin: 6px 0 0; padding: 0; list-style: none; }
-.dshps-chip { padding: 2px 7px; border-radius: var(--dsw-radius-xs); background: var(--dsw-alias-fill-tsp-secondary); font-size: 12px; line-height: 18px; color: var(--dsw-alias-label-secondary); }
+.dshps-chip { min-width: 0; padding: 2px 7px; border-radius: var(--dsw-radius-xs); background: var(--dsw-alias-interactive-bg-hover); font-size: 12px; line-height: 18px; color: var(--dsw-alias-label-secondary); }
 .dshps-chip[data-kind='loss'] { color: var(--dsw-alias-state-error-primary); }
-.dshps-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 20px; }
+.dshps-actions { display: flex; flex: none; flex-wrap: wrap; justify-content: flex-end; gap: 8px; padding: 16px 24px 24px; }
 .dshps-button {
-  height: 32px; padding: 0 14px; border: 1px solid var(--dsw-alias-border-l2); border-radius: var(--dsw-radius-sm);
-  background: var(--dsw-alias-bg-layer-2); color: var(--dsw-alias-label-primary);
-  font-size: 13px; line-height: 20px; cursor: pointer;
+  min-height: 36px; max-width: 100%; padding: 4px 14px; border: 0; border-radius: var(--dsw-radius-md);
+  background: transparent; color: var(--dsw-alias-label-primary);
+  font-family: inherit; font-size: 14px; line-height: 22px; cursor: pointer;
 }
 @media (hover: hover) { .dshps-button:hover:not(:disabled) { background: var(--dsw-alias-interactive-bg-hover); } }
 .dshps-button:disabled { cursor: default; opacity: 0.6; }
-.dshps-button-primary { border-color: transparent; background: var(--dsw-alias-button-primary-fill); color: var(--dsw-alias-label-on-color); }
+.dshps-button-primary { background: var(--dsw-alias-button-primary-fill); color: var(--dsw-alias-label-primary-foreground); }
 @media (hover: hover) { .dshps-button-primary:hover:not(:disabled) { background: var(--dsw-alias-button-primary-hover); } }
 .dshps-button:focus-visible { outline: 2px solid var(--dsw-alias-border-selected); outline-offset: 2px; }
 `
@@ -405,6 +419,11 @@ interface ConfirmState {
 interface MenuAnchor {
   readonly top: number
   readonly left: number
+}
+
+function menuAnchor(trigger: HTMLButtonElement): MenuAnchor {
+  const rect = trigger.getBoundingClientRect()
+  return { top: rect.bottom + 6, left: rect.left }
 }
 
 /**
@@ -692,11 +711,16 @@ function createModeButton(ctx: ClientContext, reactModule: ReactModule) {
         if (confirm !== null) setConfirm(null)
         else setOpen(false)
       }
+      const onResize = (): void => {
+        if (triggerRef.current !== null) setAnchor(menuAnchor(triggerRef.current))
+      }
       document.addEventListener('pointerdown', onPointer, true)
       document.addEventListener('keydown', onKey)
+      window.addEventListener('resize', onResize)
       return () => {
         document.removeEventListener('pointerdown', onPointer, true)
         document.removeEventListener('keydown', onKey)
+        window.removeEventListener('resize', onResize)
       }
     }, [open, confirm])
 
@@ -733,14 +757,9 @@ function createModeButton(ctx: ClientContext, reactModule: ReactModule) {
     }
 
     const toggle = (): void => {
-      if (busy) return
+      if (busy || triggerRef.current === null) return
       setError(null)
-      const rect = triggerRef.current?.getBoundingClientRect()
-      const width = 320
-      const viewport = typeof window === 'undefined' ? width + 16 : window.innerWidth
-      setAnchor(rect === undefined
-        ? { top: 64, left: 64 }
-        : { top: rect.bottom + 6, left: Math.max(8, Math.min(rect.left, viewport - width - 8)) })
+      setAnchor(menuAnchor(triggerRef.current))
       setOpen(value => !value)
     }
 
@@ -803,7 +822,11 @@ function createModeButton(ctx: ClientContext, reactModule: ReactModule) {
         ref: menuRef,
         role: 'menu',
         'aria-label': t('menuTitle'),
-        style: { top: `${anchor.top}px`, left: `${anchor.left}px` },
+        hidden: confirm !== null,
+        style: {
+          '--dshps-menu-top': `${anchor.top}px`,
+          '--dshps-menu-left': `${anchor.left}px`,
+        } as React.CSSProperties,
       },
       reactModule.createElement('div', { className: 'dshps-menu-head' }, t('menuTitle')),
       roster.status === 'loading' && reactModule.createElement('div', { className: 'dshps-note' }, t('loading')),
@@ -839,32 +862,33 @@ function createModeButton(ctx: ClientContext, reactModule: ReactModule) {
         'aria-modal': 'true',
         'aria-labelledby': 'dshps-confirm-title',
       },
-      reactModule.createElement('h2', { className: 'dshps-dialog-title', id: 'dshps-confirm-title' },
-        t('confirmTitle', { name: nameOf(confirm.preset) })),
-      reactModule.createElement('p', { className: 'dshps-dialog-note' }, t('confirmNote')),
-      confirm.impact.removed.length > 0 && reactModule.createElement('div', { className: 'dshps-section' },
-        reactModule.createElement('div', { className: 'dshps-section-title' }, t('confirmRemoved')),
-        reactModule.createElement('ul', { className: 'dshps-chips' },
-          confirm.impact.removed.map(row => reactModule.createElement('li', {
-            key: row.key,
-            className: 'dshps-chip',
-            'data-kind': 'loss',
-          }, rowLabel(row))))),
-      confirm.impact.disabled.length > 0 && reactModule.createElement('div', { className: 'dshps-section' },
-        reactModule.createElement('div', { className: 'dshps-section-title' }, t('confirmDisabled')),
-        reactModule.createElement('ul', { className: 'dshps-chips' },
-          confirm.impact.disabled.map(row => reactModule.createElement('li', {
-            key: row.key,
-            className: 'dshps-chip',
-            'data-kind': 'loss',
-          }, rowLabel(row))))),
-      confirm.impact.added.length > 0 && reactModule.createElement('div', { className: 'dshps-section' },
-        reactModule.createElement('div', { className: 'dshps-section-title' }, t('confirmAdded')),
-        reactModule.createElement('ul', { className: 'dshps-chips' },
-          confirm.impact.added.map(row => reactModule.createElement('li', {
-            key: row.key,
-            className: 'dshps-chip',
-          }, rowLabel(row))))),
+      reactModule.createElement('div', { className: 'dshps-dialog-content' },
+        reactModule.createElement('h2', { className: 'dshps-dialog-title', id: 'dshps-confirm-title' },
+          t('confirmTitle', { name: nameOf(confirm.preset) })),
+        reactModule.createElement('p', { className: 'dshps-dialog-note' }, t('confirmNote')),
+        confirm.impact.removed.length > 0 && reactModule.createElement('div', { className: 'dshps-section' },
+          reactModule.createElement('div', { className: 'dshps-section-title' }, t('confirmRemoved')),
+          reactModule.createElement('ul', { className: 'dshps-chips' },
+            confirm.impact.removed.map(row => reactModule.createElement('li', {
+              key: row.key,
+              className: 'dshps-chip',
+              'data-kind': 'loss',
+            }, rowLabel(row))))),
+        confirm.impact.disabled.length > 0 && reactModule.createElement('div', { className: 'dshps-section' },
+          reactModule.createElement('div', { className: 'dshps-section-title' }, t('confirmDisabled')),
+          reactModule.createElement('ul', { className: 'dshps-chips' },
+            confirm.impact.disabled.map(row => reactModule.createElement('li', {
+              key: row.key,
+              className: 'dshps-chip',
+              'data-kind': 'loss',
+            }, rowLabel(row))))),
+        confirm.impact.added.length > 0 && reactModule.createElement('div', { className: 'dshps-section' },
+          reactModule.createElement('div', { className: 'dshps-section-title' }, t('confirmAdded')),
+          reactModule.createElement('ul', { className: 'dshps-chips' },
+            confirm.impact.added.map(row => reactModule.createElement('li', {
+              key: row.key,
+              className: 'dshps-chip',
+            }, rowLabel(row)))))),
       reactModule.createElement('div', { className: 'dshps-actions' },
         reactModule.createElement('button', {
           ref: cancelRef,
