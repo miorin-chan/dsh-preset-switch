@@ -286,12 +286,11 @@ const MENU_GUTTER = 8
 // (DSH 0.2.2-rc.5, shipped dsh-web-frontend/dist/assets/index-CSAdOBx6.css).
 const STYLES = `
 .dshps-root {
-  /* Cancel the strip's 10px gap before this entry. The revealed root starts
-     flush with the label, so its 4px inset is part of the hover target. */
+  /* Cancel the strip's 10px gap so the 4px inset bridges the hover targets.
+     Reveal the full button width before fading it in. */
   position: relative; display: inline-flex; align-items: center; flex: none;
   height: 24px; width: calc(26px * var(--dshps-revealed, 0)); overflow: clip;
   margin-inline-start: -10px;
-  transition: width 160ms ease;
 }
 .dshps-root:is([data-open='true'], :has(.dshps-trigger:focus-visible)),
 .dshps-root:not(${PRESET_LABEL} + .dshps-root) {
@@ -301,7 +300,7 @@ const STYLES = `
   display: inline-flex; align-items: center; justify-content: center; flex: none;
   width: 22px; height: 22px; padding: 0; margin-inline-start: 4px;
   border: none; border-radius: var(--dsw-radius-xs);
-  background: var(--dsw-alias-interactive-bg-hover);
+  background: transparent;
   color: var(--dsw-alias-label-tertiary); cursor: pointer;
   opacity: var(--dshps-revealed, 0);
   transition: opacity 120ms ease, background-color 120ms ease, color 120ms ease;
@@ -309,7 +308,7 @@ const STYLES = `
 @media (hover: hover) {
   ${PRESET_LABEL}:hover + .dshps-root,
   .dshps-root:hover { --dshps-revealed: 1; }
-  .dshps-trigger:hover { background: var(--dsw-alias-interactive-bg-hover); color: var(--dsw-alias-label-primary); }
+  .dshps-trigger:hover:not(:disabled) { background: var(--dsw-alias-interactive-bg-hover); color: var(--dsw-alias-label-primary); }
 }
 @media (hover: none) {
   .dshps-root { --dshps-revealed: 1; }
@@ -319,8 +318,8 @@ const STYLES = `
   .dshps-root { --dshps-revealed: 1; margin-inline-start: 0; }
 }
 .dshps-trigger:focus-visible { outline: 2px solid var(--dsw-alias-border-selected); outline-offset: -2px; }
-.dshps-trigger:disabled { cursor: default; color: var(--dsw-alias-label-quaternary); }
 .dshps-trigger[aria-expanded='true'] { background: var(--dsw-alias-interactive-bg-hover); color: var(--dsw-alias-label-primary); }
+.dshps-trigger:disabled { cursor: default; color: var(--dsw-alias-label-dimmed); }
 .dshps-menu {
   position: fixed; top: var(--dshps-menu-top); z-index: 1000;
   left: clamp(${MENU_GUTTER}px, var(--dshps-menu-left), calc(100% - ${MENU_WIDTH + MENU_GUTTER}px));
@@ -403,11 +402,10 @@ interface CompositionImpact {
 }
 
 /** Roster read state for the menu. */
-interface RosterState {
-  readonly status: 'loading' | 'ready' | 'error'
-  readonly presets: readonly AgentPresetRow[]
-  readonly error: string | null
-}
+type RosterState =
+  | { readonly status: 'loading' }
+  | { readonly status: 'ready'; readonly presets: readonly AgentPresetRow[] }
+  | { readonly status: 'error'; readonly error: string }
 
 /** Pending confirmation after a lossy comparison. */
 interface ConfirmState {
@@ -651,14 +649,12 @@ function createModeButton(ctx: ClientContext, reactModule: ReactModule) {
   return function ModeButton(props: ModeButtonProps): React.ReactNode {
     const t: TranslateNS<typeof NS> = typeof props.t === 'function' ? props.t : translator(LABELS.en)
     const sessionId = props.sessionId
-    const current = typeof props.useSessions === 'function'
-      ? props.useSessions(state => state.byId[sessionId]?.projectionValues?.agentPreset)
-      : undefined
-    const currentPresetId = current === null ? undefined : current
+    // The per-session projection updates before the session list summary.
+    const currentPresetId = props.useProjection('agentPreset')
 
     const [open, setOpen] = reactModule.useState(false)
     const [anchor, setAnchor] = reactModule.useState<MenuAnchor | null>(null)
-    const [roster, setRoster] = reactModule.useState<RosterState>({ status: 'loading', presets: [], error: null })
+    const [roster, setRoster] = reactModule.useState<RosterState>({ status: 'loading' })
     const [busy, setBusy] = reactModule.useState(false)
     const [error, setError] = reactModule.useState<string | null>(null)
     const [confirm, setConfirm] = reactModule.useState<ConfirmState | null>(null)
@@ -674,24 +670,22 @@ function createModeButton(ctx: ClientContext, reactModule: ReactModule) {
       // while the conversation stays open.
       if (!open) return undefined
       let alive = true
-      setRoster(state => ({ status: 'loading', presets: state.presets, error: null }))
       ctx.remote.agentPresets.list().then((result) => {
         if (!alive) return
         if (!result.ok) {
           if (result.error.code === 'gateway/invocation-unavailable') {
-            setRoster({ status: 'ready', presets: [], error: null })
+            setRoster({ status: 'ready', presets: [] })
           } else {
-            setRoster({ status: 'error', presets: [], error: result.error.message })
+            setRoster({ status: 'error', error: result.error.message })
           }
           return
         }
         setRoster({
           status: 'ready',
           presets: result.value.presets.filter(preset => preset.broken === undefined),
-          error: null,
         })
       }, (failure: unknown) => {
-        if (alive) setRoster({ status: 'error', presets: [], error: failure instanceof Error ? failure.message : String(failure) })
+        if (alive) setRoster({ status: 'error', error: failure instanceof Error ? failure.message : String(failure) })
       })
       return () => { alive = false }
     }, [open])
@@ -758,9 +752,15 @@ function createModeButton(ctx: ClientContext, reactModule: ReactModule) {
 
     const toggle = (): void => {
       if (busy || triggerRef.current === null) return
+      if (open) {
+        close()
+        return
+      }
       setError(null)
       setAnchor(menuAnchor(triggerRef.current))
-      setOpen(value => !value)
+      // Reset before the first open render, while the roster read runs in the effect.
+      setRoster({ status: 'loading' })
+      setOpen(true)
     }
 
     const dispatch = async (id: string): Promise<void> => {
@@ -776,7 +776,7 @@ function createModeButton(ctx: ClientContext, reactModule: ReactModule) {
         if (preset.id === currentPresetId) close()
         return
       }
-      if (currentPresetId === undefined) return
+      if (typeof currentPresetId !== 'string') return
       setBusy(true)
       setError(null)
       try {
@@ -813,9 +813,9 @@ function createModeButton(ctx: ClientContext, reactModule: ReactModule) {
 
     // Hooks above run for every render; hiding here keeps the header clean
     // when the deployment composes no presets or the session records none.
-    if (currentPresetId === undefined) return null
+    if (typeof currentPresetId !== 'string') return null
 
-    const others = roster.presets.filter(preset => preset.id !== currentPresetId)
+    const others = roster.status === 'ready' ? roster.presets.filter(preset => preset.id !== currentPresetId) : []
     const menu = open && anchor !== null
       ? reactModule.createElement('div', {
         className: 'dshps-menu',
@@ -831,7 +831,7 @@ function createModeButton(ctx: ClientContext, reactModule: ReactModule) {
       reactModule.createElement('div', { className: 'dshps-menu-head' }, t('menuTitle')),
       roster.status === 'loading' && reactModule.createElement('div', { className: 'dshps-note' }, t('loading')),
       roster.status === 'error' && reactModule.createElement('div', { className: 'dshps-note' }, t('loadFailed')),
-      roster.status === 'error' && roster.error !== null && reactModule.createElement('div', { className: 'dshps-error', role: 'alert' }, roster.error),
+      roster.status === 'error' && reactModule.createElement('div', { className: 'dshps-error', role: 'alert' }, roster.error),
       roster.status === 'ready' && others.length === 0 && reactModule.createElement('div', { className: 'dshps-note' }, t('empty')),
       others.map(preset => reactModule.createElement('button', {
         key: preset.id,

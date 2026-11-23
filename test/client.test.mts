@@ -224,21 +224,62 @@ test('renders the header chevron only when the session records a preset', () => 
   const { ctx, slots } = fakeContext()
   plugin.apply(ctx)
   const Component = slots[0].component
-  assert.equal(Component({ sessionId: 'session-1', t: key => key, useSessions: () => undefined }), null)
+  assert.equal(Component({ sessionId: 'session-1', t: key => key, useProjection: () => undefined }), null)
 
-  const tree = Component({ sessionId: 'session-1', t: key => key, useSessions: () => 'standard' })
+  const tree = Component({ sessionId: 'session-1', t: key => key, useProjection: () => 'standard' })
   assert.equal(tree.type, 'span')
   assert.equal(tree.props['data-open'], false, 'the picker starts closed')
-  const trigger = tree.children.find(child => child !== null && child.props?.className === 'dshps-trigger')
+  const trigger = tree.children.find(child => child?.props?.className === 'dshps-trigger')
   assert.ok(trigger, 'the chevron button renders beside the shipped label')
   assert.equal(trigger.props['aria-haspopup'], 'menu')
   assert.equal(trigger.props['aria-expanded'], false)
 })
 
+test('reopening waits for the roster and excludes the live preset even if the summary is stale', (t) => {
+  const { ctx, slots } = fakeContext()
+  plugin.apply(ctx)
+  const roster = { status: 'ready', presets: [{ id: 'standard' }, { id: 'cordis' }] }
+  const state = [false, null, roster]
+  let nextState = 0
+  t.mock.method(reactStub, 'useState', initial => {
+    const index = nextState++
+    if (index >= state.length) return [initial, () => undefined]
+    return [state[index], update => {
+      state[index] = typeof update === 'function' ? update(state[index]) : update
+    }]
+  })
+  t.mock.method(reactStub, 'useRef', () => ({ current: { getBoundingClientRect: () => ({ left: 100, bottom: 24 }) } }))
+
+  const props = {
+    sessionId: 'session-1',
+    t: key => key,
+    useSessions: select => select({ byId: { 'session-1': { projectionValues: { agentPreset: 'standard' } } } }),
+    useProjection: key => {
+      assert.equal(key, 'agentPreset')
+      return 'cordis'
+    },
+  }
+  const render = () => {
+    nextState = 0
+    return slots[0].component(props)
+  }
+  const menuRows = () => {
+    const menu = render().children.find(child => child?.props?.role === 'menu')
+    assert.ok(menu)
+    return menu.children.flat().filter(child => child?.props?.role === 'menuitem').map(child => child.props.key)
+  }
+
+  const trigger = render().children.find(child => child?.props?.className === 'dshps-trigger')
+  trigger.props.onClick()
+  assert.deepEqual(menuRows(), [], 'the first render after opening cannot use the previous roster')
+  state[2] = roster
+  assert.deepEqual(menuRows(), ['standard'], 'the current preset is excluded as soon as the roster arrives')
+})
+
 test('scopes pointer reveal to the adjacent preset label and chevron', () => {
   const { ctx, slots } = fakeContext()
   plugin.apply(ctx)
-  const tree = slots[0].component({ sessionId: 'session-1', t: key => key, useSessions: () => 'standard' })
+  const tree = slots[0].component({ sessionId: 'session-1', t: key => key, useProjection: () => 'standard' })
   const [styles] = tree.children.find(child => child?.type === 'style').children
   const [hoverRules] = styles.split('@media (hover: hover) {')[1].split('@media (hover: none) {')
   const revealRule = hoverRules.match(/([^{}]+)\{ --dshps-revealed: 1; \}/)
@@ -246,12 +287,13 @@ test('scopes pointer reveal to the adjacent preset label and chevron', () => {
     '.nIjNjW_label:hover + .dshps-root',
     '.dshps-root:hover',
   ])
+  assert.match(styles, /\.dshps-trigger \{[^}]*background: transparent;/)
 })
 
 test('uses the host primary button foreground in the confirmation dialog', () => {
   const { ctx, slots } = fakeContext()
   plugin.apply(ctx)
-  const tree = slots[0].component({ sessionId: 'session-1', t: key => key, useSessions: () => 'standard' })
+  const tree = slots[0].component({ sessionId: 'session-1', t: key => key, useProjection: () => 'standard' })
   const [styles] = tree.children.find(child => child?.type === 'style').children
   const primaryButton = styles.match(/\.dshps-button-primary \{([^}]+)\}/)?.[1]
   assert.match(primaryButton ?? '', /color:\s*var\(--dsw-alias-label-primary-foreground\)/)
@@ -262,7 +304,7 @@ test('renders nothing when the preset projection is null', () => {
   plugin.apply(ctx)
   const Component = slots[0].component
   assert.equal(
-    Component({ sessionId: 'session-1', t: key => key, useSessions: () => null }),
+    Component({ sessionId: 'session-1', t: key => key, useProjection: () => null }),
     null,
     'a null projection records no preset, so the header entry stays hidden',
   )
