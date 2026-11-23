@@ -33,13 +33,16 @@ Check whether new behavior belongs in its own bundle.
 
 ## Structure
 
+`npm run build:tools` compiles `.mts` tooling in `scripts/` to adjacent ignored `.mjs` files.
+Node.js 22.18 or newer runs the `.test.mts` files directly.
+
 - `src/client/index.ts` is the browser half's source.
   `node scripts/build.mjs` generates `client.js`, which Git ignores.
   Read the mechanism note at the top of the source before changing it.
   Do not hand-edit the artifact — the `--check` mode in `npm run check` keeps it in sync with the source.
 - `src/host/index.ts` is the Host half: it registers the `/preset-switch` command, owns the idle/compaction checks,
   serializes switches per Agent, calls `agentPresets.recompose()`, and appends the `agent-preset/selected` event.
-- `tsconfig.json`, `scripts/build.mjs`, and `scripts/sync-types.mjs` are the TypeScript base copied
+- `tsconfig.json`, `scripts/build.mts`, and `scripts/sync-types.mts` are the TypeScript base copied
   from the workspace `tools/dsh-plugin-ts/` template.
   Types are used only through `import type`, so neither artifact carries a runtime `@deepseek-ai/*` dependency.
 - The session-log scan reads the typed `SessionEvent` union from `@deepseek-ai/dsh-session`;
@@ -50,9 +53,9 @@ Check whether new behavior belongs in its own bundle.
   Do not read that merged `ctx.sessions` in the browser source.
 - Keep Plugin Manager metadata in `locale/*.json`, picker translations in `LABELS` in the browser source,
   and shared slash-command translations and spellings in `src/command-locale.ts`.
-- [test/client.test.mjs](test/client.test.mjs) checks registration and cleanup, localized slash aliases,
+- [test/client.test.mts](test/client.test.mts) checks registration and cleanup, localized slash aliases,
   and the picker’s row parser and change classification.
-- [test/command.test.mjs](test/command.test.mjs) covers idle/compaction refusals, the no-op case,
+- [test/command.test.mts](test/command.test.mts) covers idle/compaction refusals, the no-op case,
   and the committed `agent-preset/selected` event.
 - Both tests load the built `client.js`/`index.js`, so the source migration does not change them.
 - `docs/scripts/reflow` is the standalone documentation formatter and requires Python 3.11 or newer.
