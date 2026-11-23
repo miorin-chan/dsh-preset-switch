@@ -105,7 +105,7 @@ Update `CHANGELOG.md` when releasing.
   and the pinned type packages in that order.
   Use `npm run build` to regenerate artifacts after editing the source.
 - After a DSH upgrade, run `node scripts/sync-types.mjs` to repin the type packages, then `npm run check`.
-- From the workspace root, run `node tools/new-dsh-plugin/cli.mjs --check plugins/dsh-preset-switch`.
+- From the workspace root, run `node tools/new-dsh-plugin/cli.mts --check plugins/dsh-preset-switch`.
 - Use a disposable profile for installation tests.
   Distinguish fixture results from observations in the UI.
 - After a DSH upgrade, run the tests and verify the behavior in the running UI.
