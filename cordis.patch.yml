@@ -2,4 +2,4 @@
 # ships through package.json `dsh.client` and adds the header control.
 - insert:
     - id: dsh-preset-switch
-      name: 'dsh-preset-switch'
+      name: '@miorin/dsh-preset-switch'

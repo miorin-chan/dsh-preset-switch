@@ -12,7 +12,7 @@ globalThis.window = {
 }
 await import('../client.js')
 
-assert.equal(registration.id, 'dsh-preset-switch')
+assert.equal(registration.id, '@miorin/dsh-preset-switch')
 
 /** A React stub: enough for the component's first render, no page needed. */
 const reactStub = {

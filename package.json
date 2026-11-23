@@ -1,5 +1,5 @@
 {
-  "name": "dsh-preset-switch",
+  "name": "@miorin/dsh-preset-switch",
   "version": "0.1.0",
   "private": true,
   "license": "MIT",
