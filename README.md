@@ -16,7 +16,8 @@ and Desktop profiles do).
 
 ## Install
 
-In **Plugins** > **Add plugin**, choose this directory, or call `plugin_manager` with `install_bundle`.
+Run `pnpm install --frozen-lockfile` in a fresh checkout to install dependencies and build the plugin.
+Then choose this directory in **Plugins** > **Add plugin**, or call `plugin_manager` with `install_bundle`.
 The bundle appears as **Agent mode switch**.
 Disable it in **Plugins** to unload it.
 

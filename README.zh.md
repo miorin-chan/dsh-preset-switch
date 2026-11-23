@@ -13,7 +13,8 @@
 
 ## 安装
 
-在 **插件** > **添加插件** 中选择本目录，或用 `plugin_manager` 的 `install_bundle`。
+在新检出的目录中运行 `pnpm install --frozen-lockfile` 安装依赖并构建插件。
+然后在 **插件** > **添加插件** 中选择该目录，或用 `plugin_manager` 的 `install_bundle`。
 插件显示为 **切换 Agent 模式**，在 **插件** 中停用即可卸载。
 
 ## 使用

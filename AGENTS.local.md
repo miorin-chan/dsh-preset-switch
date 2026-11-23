@@ -33,8 +33,8 @@ Check whether new behavior belongs in its own bundle.
 
 ## Structure
 
-- `src/client/index.ts` is the browser half's source; `client.js` is generated
-  by `node scripts/build.mjs` and committed.
+- `src/client/index.ts` is the browser half's source.
+  `node scripts/build.mjs` generates `client.js`, which Git ignores.
   Read the mechanism note at the top of the source before changing it.
   Do not hand-edit the artifact — the `--check` mode in `npm run check` keeps it in sync with the source.
 - `src/host/index.ts` is the Host half: it registers the `/preset-switch` command, owns the idle/compaction checks,
@@ -96,9 +96,11 @@ Update `CHANGELOG.md` when releasing.
 
 ## Verification
 
-- Run `npm run check` from the project directory: `node --test`, `tsc -p tsconfig.json`,
-  `node scripts/build.mjs --check`, and `node scripts/sync-types.mjs --check` check behavior, types,
-  artifact freshness, and the pinned type packages in that order.
+- Run `pnpm install --frozen-lockfile` in a fresh checkout before `npm run check`.
+  The check runs `node --test`, `tsc -p tsconfig.json`, `node scripts/build.mjs --check`,
+  and `node scripts/sync-types.mjs --check` to verify behavior, types, artifact freshness,
+  and the pinned type packages in that order.
+  Use `npm run build` to regenerate artifacts after editing the source.
 - After a DSH upgrade, run `node scripts/sync-types.mjs` to repin the type packages, then `npm run check`.
 - From the workspace root, run `node tools/new-dsh-plugin/cli.mjs --check plugins/dsh-preset-switch`.
 - Use a disposable profile for installation tests.
