@@ -1,6 +1,6 @@
 {
   "name": "@miorin/dsh-preset-switch",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "license": "MIT",
   "description": "Switches a session's Agent preset while it is idle, warning only when the new mode removes or disables plugins.",
   "type": "module",
@@ -90,5 +90,13 @@
   },
   "publishConfig": {
     "access": "public"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/miorin-chan/dsh-preset-switch.git"
+  },
+  "homepage": "https://github.com/miorin-chan/dsh-preset-switch#readme",
+  "bugs": {
+    "url": "https://github.com/miorin-chan/dsh-preset-switch/issues"
   }
 }
