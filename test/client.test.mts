@@ -233,6 +233,9 @@ test('renders the header chevron only when the session records a preset', () => 
   assert.ok(trigger, 'the chevron button renders beside the shipped label')
   assert.equal(trigger.props['aria-haspopup'], 'menu')
   assert.equal(trigger.props['aria-expanded'], false)
+  const [glyph] = trigger.children
+  assert.equal(glyph.props.className, 'dshps-chevron', 'only the glyph moves within the button')
+  assert.equal(glyph.props['aria-hidden'], 'true')
 })
 
 test('reopening waits for the roster and excludes the live preset even if the summary is stale', (t) => {
@@ -241,6 +244,7 @@ test('reopening waits for the roster and excludes the live preset even if the su
   const roster = { status: 'ready', presets: [{ id: 'standard' }, { id: 'cordis' }] }
   const state = [false, null, roster]
   let nextState = 0
+  let nextRef = 0
   t.mock.method(reactStub, 'useState', initial => {
     const index = nextState++
     if (index >= state.length) return [initial, () => undefined]
@@ -248,7 +252,8 @@ test('reopening waits for the roster and excludes the live preset even if the su
       state[index] = typeof update === 'function' ? update(state[index]) : update
     }]
   })
-  t.mock.method(reactStub, 'useRef', () => ({ current: { getBoundingClientRect: () => ({ left: 100, bottom: 24 }) } }))
+  const buttonRef = { current: { getBoundingClientRect: () => ({ left: 100, bottom: 24 }) } }
+  t.mock.method(reactStub, 'useRef', () => nextRef++ === 1 ? buttonRef : { current: null })
 
   const props = {
     sessionId: 'session-1',
@@ -261,6 +266,7 @@ test('reopening waits for the roster and excludes the live preset even if the su
   }
   const render = () => {
     nextState = 0
+    nextRef = 0
     return slots[0].component(props)
   }
   const menuRows = () => {
@@ -270,7 +276,15 @@ test('reopening waits for the roster and excludes the live preset even if the su
   }
 
   const trigger = render().children.find(child => child?.props?.className === 'dshps-trigger')
+  assert.equal(trigger.props.ref, buttonRef)
   trigger.props.onClick()
+  const opened = render()
+  assert.equal(opened.props['data-open'], true, 'the chevron stays revealed once the picker opens')
+  assert.equal(opened.children.find(child => child?.props?.className === 'dshps-trigger').props['aria-expanded'], true)
+  assert.deepEqual(opened.children.find(child => child?.props?.role === 'menu').props.style, {
+    '--dshps-menu-top': '30px',
+    '--dshps-menu-left': '100px',
+  }, 'opening anchors the menu to the button’s box')
   assert.deepEqual(menuRows(), [], 'the first render after opening cannot use the previous roster')
   state[2] = roster
   assert.deepEqual(menuRows(), ['standard'], 'the current preset is excluded as soon as the roster arrives')
@@ -287,7 +301,25 @@ test('scopes pointer reveal to the adjacent preset label and chevron', () => {
     '.nIjNjW_label:hover + .dshps-root',
     '.dshps-root:hover',
   ])
-  assert.match(styles, /\.dshps-trigger \{[^}]*background: transparent;/)
+  assert.match(styles, /\.dshps-root:is\(\[data-open='true'\], :has\(\.dshps-trigger:focus-visible\)\)/)
+  assert.match(styles, /@media \(hover: none\) \{\s*\.dshps-root \{ --dshps-revealed: 1; \}/)
+})
+
+test('slides the clipped slot and glyph without moving or highlighting the button at rest', () => {
+  const { ctx, slots } = fakeContext()
+  plugin.apply(ctx)
+  const tree = slots[0].component({ sessionId: 'session-1', t: key => key, useProjection: () => 'standard' })
+  const [styles] = tree.children.find(child => child?.type === 'style').children
+  const rule = selector => styles.split(`${selector} {`)[1]?.split('}')[0] ?? ''
+  assert.match(rule('.dshps-root'), /width: calc\(28px \* var\(--dshps-revealed, 0\)\); overflow: clip;/)
+  assert.match(rule('.dshps-root'), /transition: width 160ms/)
+  assert.match(rule('.dshps-trigger'), /width: 24px; height: 24px;/)
+  assert.doesNotMatch(rule('.dshps-trigger'), /\b(?:transform|translate|inset-inline-start):/)
+  assert.match(rule('.dshps-chevron'), /transition: inset-inline-start 160ms/)
+  assert.match(rule('.dshps-trigger'), /background: transparent;/)
+  assert.match(rule('.dshps-trigger:hover:not(:disabled)'), /background: var\(--dsw-alias-interactive-bg-hover\);/)
+  assert.doesNotMatch(styles, /\.dshps-trigger\[aria-expanded[^}]*background/)
+  assert.match(styles, /@media \(prefers-reduced-motion: reduce\) \{\s*\.dshps-root, \.dshps-chevron \{ transition: none; \}/)
 })
 
 test('uses the host primary button foreground in the confirmation dialog', () => {

@@ -286,11 +286,11 @@ const MENU_GUTTER = 8
 // (DSH 0.2.2-rc.5, shipped dsh-web-frontend/dist/assets/index-CSAdOBx6.css).
 const STYLES = `
 .dshps-root {
-  /* Cancel the strip's 10px gap so the 4px inset bridges the hover targets.
-     Reveal the full button width before fading it in. */
+  /* Cancel the strip's 10px gap so the 4px inset bridges the hover targets. */
   position: relative; display: inline-flex; align-items: center; flex: none;
-  height: 24px; width: calc(26px * var(--dshps-revealed, 0)); overflow: clip;
+  height: 24px; width: calc(28px * var(--dshps-revealed, 0)); overflow: clip;
   margin-inline-start: -10px;
+  transition: width 160ms ease;
 }
 .dshps-root:is([data-open='true'], :has(.dshps-trigger:focus-visible)),
 .dshps-root:not(${PRESET_LABEL} + .dshps-root) {
@@ -298,12 +298,17 @@ const STYLES = `
 }
 .dshps-trigger {
   display: inline-flex; align-items: center; justify-content: center; flex: none;
-  width: 22px; height: 22px; padding: 0; margin-inline-start: 4px;
-  border: none; border-radius: var(--dsw-radius-xs);
+  box-sizing: border-box; width: 24px; height: 24px; padding: 0; margin-inline-start: 4px;
+  border: none; border-radius: var(--dsw-radius-md);
   background: transparent;
   color: var(--dsw-alias-label-tertiary); cursor: pointer;
-  opacity: var(--dshps-revealed, 0);
-  transition: opacity 120ms ease, background-color 120ms ease, color 120ms ease;
+  transition: background-color 120ms ease, color 120ms ease;
+}
+.dshps-chevron {
+  /* Move only the glyph: the menu measures the button, even mid-transition. */
+  position: relative; inset-inline-start: calc(-8px * (1 - var(--dshps-revealed, 0)));
+  pointer-events: none; opacity: var(--dshps-revealed, 0);
+  transition: inset-inline-start 160ms ease, opacity 120ms ease;
 }
 @media (hover: hover) {
   ${PRESET_LABEL}:hover + .dshps-root,
@@ -317,8 +322,10 @@ const STYLES = `
 @container (max-width: 540px) {
   .dshps-root { --dshps-revealed: 1; margin-inline-start: 0; }
 }
+@media (prefers-reduced-motion: reduce) {
+  .dshps-root, .dshps-chevron { transition: none; }
+}
 .dshps-trigger:focus-visible { outline: 2px solid var(--dsw-alias-border-selected); outline-offset: -2px; }
-.dshps-trigger[aria-expanded='true'] { background: var(--dsw-alias-interactive-bg-hover); color: var(--dsw-alias-label-primary); }
 .dshps-trigger:disabled { cursor: default; color: var(--dsw-alias-label-dimmed); }
 .dshps-menu {
   position: fixed; top: var(--dshps-menu-top); z-index: 1000;
@@ -931,6 +938,7 @@ function createModeButton(ctx: ClientContext, reactModule: ReactModule) {
         onClick: toggle,
       },
       reactModule.createElement('svg', {
+        className: 'dshps-chevron',
         width: 14,
         height: 14,
         viewBox: '0 0 16 16',
