@@ -1,6 +1,6 @@
 {
   "meta": {
     "title": "Mudar o modo da sessão",
-    "description": "Permite mudar de modo no cabeçalho de uma sessão inativa. Só pede confirmação se o novo modo remover ou desativar plugins."
+    "description": "Quando a sessão está inativa, podes mudar de modo pela seta junto ao nome do modo atual no cabeçalho. Só pede confirmação se o novo modo remover ou desativar plugins."
   }
 }

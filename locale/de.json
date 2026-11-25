@@ -1,6 +1,6 @@
 {
   "meta": {
     "title": "Sitzungsmodus wechseln",
-    "description": "Wechselt den Modus einer inaktiven Sitzung über deren Kopfzeile. Eine Bestätigung ist nur nötig, wenn der neue Modus Plugins entfernt oder deaktiviert."
+    "description": "Ist die Sitzung inaktiv, lässt sich der Modus über den Pfeil neben dem aktuellen Modusnamen in der Kopfzeile wechseln. Eine Bestätigung ist nur nötig, wenn der neue Modus Plugins entfernt oder deaktiviert."
   }
 }

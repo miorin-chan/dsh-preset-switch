@@ -1,6 +1,6 @@
 {
   "meta": {
     "title": "Cambiar el modo de la sesión",
-    "description": "Permite cambiar de modo desde la cabecera de una sesión inactiva. Solo se pide confirmación si el nuevo modo elimina o desactiva plugins."
+    "description": "Si la sesión está inactiva, puedes cambiar de modo con la flecha junto al nombre del modo actual en la cabecera. Solo se pide confirmación si el nuevo modo elimina o desactiva plugins."
   }
 }

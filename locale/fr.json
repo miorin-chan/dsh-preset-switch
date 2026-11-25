@@ -1,6 +1,6 @@
 {
   "meta": {
     "title": "Changer le mode de la session",
-    "description": "Permet de changer de mode depuis l’en-tête d’une session inactive. Une confirmation est requise uniquement si le nouveau mode supprime ou désactive des plugins."
+    "description": "Quand la session est inactive, la flèche à côté du nom du mode actuel, dans l’en-tête, permet de changer de mode. Une confirmation est requise uniquement si le nouveau mode supprime ou désactive des plugins."
   }
 }
