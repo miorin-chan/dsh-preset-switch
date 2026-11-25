@@ -302,7 +302,7 @@ const STYLES = `
   border: none; border-radius: var(--dsw-radius-md);
   background: transparent;
   color: var(--dsw-alias-label-tertiary); cursor: pointer;
-  transition: background-color 120ms ease, color 120ms ease;
+  transition: color 120ms ease;
 }
 .dshps-chevron {
   /* Move only the glyph: the menu measures the button, even mid-transition. */
@@ -315,7 +315,7 @@ const STYLES = `
   .dshps-root:hover { --dshps-revealed: 1; }
   .dshps-trigger:hover:not(:disabled) { background: var(--dsw-alias-interactive-bg-hover); color: var(--dsw-alias-label-primary); }
 }
-@media (hover: none) {
+@media (hover: none), (any-pointer: coarse) {
   .dshps-root { --dshps-revealed: 1; }
 }
 /* AgentPresetLabel.module.css hides the adjacent label at this container width. */
@@ -429,6 +429,26 @@ interface MenuAnchor {
 function menuAnchor(trigger: HTMLButtonElement): MenuAnchor {
   const rect = trigger.getBoundingClientRect()
   return { top: rect.bottom + 6, left: rect.left }
+}
+
+function trackMenuAnchor(
+  trigger: HTMLButtonElement,
+  update: (anchor: MenuAnchor) => void,
+  view: Pick<Window, 'requestAnimationFrame' | 'cancelAnimationFrame'>,
+): () => void {
+  // The strip can shift the entire button when this or a neighboring slot animates.
+  // Follow its viewport position only while the portaled menu is open.
+  let previous: MenuAnchor | undefined
+  const tick = (): void => {
+    const next = menuAnchor(trigger)
+    if (previous === undefined || next.top !== previous.top || next.left !== previous.left) {
+      previous = next
+      update(next)
+    }
+    frame = view.requestAnimationFrame(tick)
+  }
+  let frame = view.requestAnimationFrame(tick)
+  return () => { view.cancelAnimationFrame(frame) }
 }
 
 /**
@@ -658,6 +678,7 @@ function createModeButton(ctx: ClientContext, reactModule: ReactModule) {
     const sessionId = props.sessionId
     // The per-session projection updates before the session list summary.
     const currentPresetId = props.useProjection('agentPreset')
+    const hasPreset = typeof currentPresetId === 'string'
 
     const [open, setOpen] = reactModule.useState(false)
     const [anchor, setAnchor] = reactModule.useState<MenuAnchor | null>(null)
@@ -712,18 +733,18 @@ function createModeButton(ctx: ClientContext, reactModule: ReactModule) {
         if (confirm !== null) setConfirm(null)
         else setOpen(false)
       }
-      const onResize = (): void => {
-        if (triggerRef.current !== null) setAnchor(menuAnchor(triggerRef.current))
-      }
       document.addEventListener('pointerdown', onPointer, true)
       document.addEventListener('keydown', onKey)
-      window.addEventListener('resize', onResize)
       return () => {
         document.removeEventListener('pointerdown', onPointer, true)
         document.removeEventListener('keydown', onKey)
-        window.removeEventListener('resize', onResize)
       }
     }, [open, confirm])
+
+    reactModule.useEffect(() => {
+      if (!open || !hasPreset || confirm !== null || triggerRef.current === null) return undefined
+      return trackMenuAnchor(triggerRef.current, setAnchor, window)
+    }, [open, hasPreset, confirm])
 
     reactModule.useEffect(() => {
       if (confirm !== null) cancelRef.current?.focus()
@@ -820,7 +841,7 @@ function createModeButton(ctx: ClientContext, reactModule: ReactModule) {
 
     // Hooks above run for every render; hiding here keeps the header clean
     // when the deployment composes no presets or the session records none.
-    if (typeof currentPresetId !== 'string') return null
+    if (!hasPreset) return null
 
     const others = roster.status === 'ready' ? roster.presets.filter(preset => preset.id !== currentPresetId) : []
     const menu = open && anchor !== null
@@ -980,4 +1001,4 @@ export function apply(ctx: ClientContext): void {
 }
 
 // Exposed for the node test only; the page never reads this field.
-export const internals = { parseComposition, diffCompositions, rowLabel, shortModule }
+export const internals = { parseComposition, diffCompositions, rowLabel, shortModule, trackMenuAnchor }

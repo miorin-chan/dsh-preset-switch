@@ -295,14 +295,14 @@ test('scopes pointer reveal to the adjacent preset label and chevron', () => {
   plugin.apply(ctx)
   const tree = slots[0].component({ sessionId: 'session-1', t: key => key, useProjection: () => 'standard' })
   const [styles] = tree.children.find(child => child?.type === 'style').children
-  const [hoverRules] = styles.split('@media (hover: hover) {')[1].split('@media (hover: none) {')
+  const [hoverRules] = styles.split('@media (hover: hover) {')[1].split('@media (hover: none), (any-pointer: coarse) {')
   const revealRule = hoverRules.match(/([^{}]+)\{ --dshps-revealed: 1; \}/)
   assert.deepEqual(revealRule?.[1].split(',').map(selector => selector.trim()), [
     '.nIjNjW_label:hover + .dshps-root',
     '.dshps-root:hover',
   ])
   assert.match(styles, /\.dshps-root:is\(\[data-open='true'\], :has\(\.dshps-trigger:focus-visible\)\)/)
-  assert.match(styles, /@media \(hover: none\) \{\s*\.dshps-root \{ --dshps-revealed: 1; \}/)
+  assert.match(styles, /@media \(hover: none\), \(any-pointer: coarse\) \{\s*\.dshps-root \{ --dshps-revealed: 1; \}/)
 })
 
 test('slides the clipped slot and glyph without moving or highlighting the button at rest', () => {
@@ -317,9 +317,40 @@ test('slides the clipped slot and glyph without moving or highlighting the butto
   assert.doesNotMatch(rule('.dshps-trigger'), /\b(?:transform|translate|inset-inline-start):/)
   assert.match(rule('.dshps-chevron'), /transition: inset-inline-start 160ms/)
   assert.match(rule('.dshps-trigger'), /background: transparent;/)
+  assert.doesNotMatch(rule('.dshps-trigger'), /transition:[^;]*\b(?:all|background(?:-color)?)\b/)
   assert.match(rule('.dshps-trigger:hover:not(:disabled)'), /background: var\(--dsw-alias-interactive-bg-hover\);/)
   assert.doesNotMatch(styles, /\.dshps-trigger\[aria-expanded[^}]*background/)
   assert.match(styles, /@media \(prefers-reduced-motion: reduce\) \{\s*\.dshps-root, \.dshps-chevron \{ transition: none; \}/)
+})
+
+test('follows button movement while the menu is open and cancels the pending frame on close', () => {
+  const frames = new Map<number, () => void>()
+  let nextFrame = 0
+  const view = {
+    requestAnimationFrame(callback) {
+      frames.set(++nextFrame, callback)
+      return nextFrame
+    },
+    cancelAnimationFrame(frame) { frames.delete(frame) },
+  }
+  const advance = () => {
+    const [frame, callback] = [...frames.entries()][0]
+    frames.delete(frame)
+    callback()
+  }
+  let rect = { left: 100, bottom: 24 }
+  const button = { getBoundingClientRect: () => rect }
+  const updates = []
+  const stop = plugin.internals.trackMenuAnchor(button, anchor => updates.push(anchor), view)
+  advance()
+  rect = { left: 83, bottom: 24 }
+  advance()
+  advance()
+  rect = { left: 83, bottom: 20 }
+  advance()
+  assert.deepEqual(updates, [{ left: 100, top: 30 }, { left: 83, top: 30 }, { left: 83, top: 26 }])
+  stop()
+  assert.equal(frames.size, 0)
 })
 
 test('uses the host primary button foreground in the confirmation dialog', () => {
