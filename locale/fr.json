@@ -1,6 +1,6 @@
 {
   "meta": {
-    "title": "Changer le mode de l’agent",
-    "description": "Change le preset d’agent d’une session pendant qu’elle est inactive. Le bouton de preset dans l’en-tête de la session l’ouvre ; une confirmation n’apparaît que si le nouveau mode supprime ou désactive des plugins."
+    "title": "Changer le mode de la session",
+    "description": "Permet de changer de mode depuis l’en-tête d’une session inactive. Une confirmation est requise uniquement si le nouveau mode supprime ou désactive des plugins."
   }
 }

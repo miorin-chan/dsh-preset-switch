@@ -1,6 +1,6 @@
 {
   "meta": {
-    "title": "Agent-Modus wechseln",
-    "description": "Wechselt das Agent-Preset einer Sitzung, solange sie im Leerlauf ist. Die Preset-Schaltfläche in der Sitzungsüberschrift öffnet den Wechsel; eine Bestätigung erscheint nur, wenn der neue Modus Plugins entfernt oder deaktiviert."
+    "title": "Sitzungsmodus wechseln",
+    "description": "Wechselt den Modus einer inaktiven Sitzung über deren Kopfzeile. Eine Bestätigung ist nur nötig, wenn der neue Modus Plugins entfernt oder deaktiviert."
   }
 }

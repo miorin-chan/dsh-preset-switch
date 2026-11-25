@@ -1,6 +1,6 @@
 {
   "meta": {
-    "title": "Cambiar el modo del agente",
-    "description": "Cambia el preset de agente de una sesión mientras está inactiva. El botón de preset de la cabecera de la sesión lo abre; solo se pide confirmación cuando el nuevo modo elimina o desactiva plugins."
+    "title": "Cambiar el modo de la sesión",
+    "description": "Permite cambiar de modo desde la cabecera de una sesión inactiva. Solo se pide confirmación si el nuevo modo elimina o desactiva plugins."
   }
 }
