@@ -172,6 +172,24 @@ test('parses rows, drops groups, and keeps conditional disables enabled', () => 
   assert.ok(rows.every(row => row.name !== 'cordis:group'), 'group rows are structural')
 })
 
+test('ignores nested list entries under non-group plugin config blocks', () => {
+  const withNestedConfig = `${standard}
+- id: mcp-bridge
+  name: '@deepseek-ai/dsh-mcp'
+  config:
+    servers:
+      - name: nested-server
+        disabled: true
+  disabled: false
+`
+  const rows = plugin.internals.parseComposition(withNestedConfig)
+  assert.deepEqual(rows.map(row => row.id), ['persona', 'tool-bash', 'plan-mode', 'workflow-ptc', 'tool-fs', 'mcp-bridge'])
+  const mcp = rows.find(row => row.id === 'mcp-bridge')
+  assert.equal(mcp.name, '@deepseek-ai/dsh-mcp')
+  assert.equal(mcp.disabled, false)
+  assert.equal(rows.some(row => row.name === 'nested-server'), false)
+})
+
 test('an added row alone is not a loss', () => {
   const creator = `${standard}\n- id: tool-cordis\n  name: '@deepseek-ai/dsh-tool-cordis'\n`
     .replace('prefix: You are a coding agent.', 'prefix: You help customize DSH.')

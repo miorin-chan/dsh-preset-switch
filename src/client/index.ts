@@ -491,12 +491,19 @@ function unquote(value: string): string {
 export function parseComposition(text: string): CompositionRow[] {
   const rows: ParsedRow[] = []
   let row: ParsedRow | undefined
+  let ignoredIndent: number | undefined
   const finish = (): void => {
     if (row === undefined) return
     rows.push(row)
     row = undefined
   }
   for (const line of text.split('\n')) {
+    if (line.trim() === '' || /^\s*#/.test(line)) continue
+    const indent = /^\s*/.exec(line)?.[0].length ?? 0
+    if (ignoredIndent !== undefined) {
+      if (indent > ignoredIndent) continue
+      ignoredIndent = undefined
+    }
     const marker = /^(\s*)-\s+(.*)$/.exec(line)
     if (marker !== null) {
       finish()
@@ -505,12 +512,20 @@ export function parseComposition(text: string): CompositionRow[] {
       if (field !== null) row.fields[field[1]] = unquote(field[2])
       continue
     }
-    if (row === undefined || line.trim() === '') continue
+    if (row === undefined) continue
     const field = /^\s+([A-Za-z0-9_-]+):\s*(.*)$/.exec(line)
     if (field === null) continue
-    const indent = /^\s*/.exec(line)?.[0].length ?? 0
     if (indent <= row.indent) {
       finish()
+      continue
+    }
+    if (
+      field[1] === 'config'
+      && field[2].trim() === ''
+      && row.fields.name !== 'cordis:group'
+      && row.fields.group !== 'true'
+    ) {
+      ignoredIndent = indent
       continue
     }
     row.fields[field[1]] = unquote(field[2])
