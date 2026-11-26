@@ -30,14 +30,10 @@
     "DESIGN.md",
     "CHANGELOG.md",
     "docs/README.md",
-    "README.zh.md",
-    "src",
-    "scripts",
-    "tsconfig.json",
-    "tsconfig.tools.json"
+    "README.zh.md"
   ],
   "engines": {
-    "dsh": ">=0.2.2-rc.3"
+    "dsh": ">=0.2.2-rc.5"
   },
   "dsh": {
     "bundle": {
@@ -75,6 +71,7 @@
     "@deepseek-ai/dsh-client-store": "0.2.2-rc.5",
     "@deepseek-ai/dsh-client-ui-conversation": "0.2.2-rc.5",
     "@deepseek-ai/dsh-client-ui-input-trigger": "0.2.2-rc.5",
+    "@deepseek-ai/dsh-client-ui-primitives": "0.2.2-rc.5",
     "@deepseek-ai/dsh-client-ui-renderer": "0.2.2-rc.5",
     "@deepseek-ai/dsh-client-ui-session": "0.2.2-rc.5",
     "@deepseek-ai/dsh-client-ui-slots": "0.2.2-rc.5",

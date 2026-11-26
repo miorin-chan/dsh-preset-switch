@@ -9,7 +9,7 @@
 或停用当前启用的行时才提示；纯新增的切换（例如切到创造模式）直接生效。
 代码里不列任何预设对应关系，自定义预设和被编辑过的内置预设走同一套规则。
 
-需要 DeepSeek Harness 0.2.2-rc.3 或更新版本，且部署装配了 Agent preset（Web 与桌面 profile 默认如此）。
+需要 DeepSeek Harness 0.2.2-rc.5 或更新版本，且部署装配了 Agent preset（Web 与桌面 profile 默认如此）。
 
 ## 安装
 

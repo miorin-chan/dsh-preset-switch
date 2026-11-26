@@ -36,7 +36,7 @@ Check whether new behavior belongs in its own bundle.
 `npm run build:tools` compiles `.mts` tooling in `scripts/` to adjacent ignored `.mjs` files.
 Node.js 22.18 or newer runs the `.test.mts` files directly.
 
-- `src/client/index.ts` is the browser half's source.
+- `src/client/index.tsx` is the browser half's source.
   `node scripts/build.mjs` generates `client.js`, which Git ignores.
   Read the mechanism note at the top of the source before changing it.
   Do not hand-edit the artifact — the `--check` mode in `npm run check` keeps it in sync with the source.
@@ -44,7 +44,8 @@ Node.js 22.18 or newer runs the `.test.mts` files directly.
   serializes switches per Agent, calls `agentPresets.recompose()`, and appends the `agent-preset/selected` event.
 - `tsconfig.json`, `scripts/build.mts`, and `scripts/sync-types.mts` are the TypeScript base copied
   from the workspace `tools/dsh-plugin-ts/` template.
-  Types are used only through `import type`, so neither artifact carries a runtime `@deepseek-ai/*` dependency.
+  Browser UI components and icons reuse `@deepseek-ai/dsh-client-ui-primitives` seeded in the Host module table;
+  other `@deepseek-ai/*` imports are `import type` only, so neither artifact bundles internal DSH code.
 - The session-log scan reads the typed `SessionEvent` union from `@deepseek-ai/dsh-session`;
   the `compaction/*` members arrive through `@deepseek-ai/dsh-compaction/types`.
   Keep both in the program when editing the scan — that union is the reason this half is typed.

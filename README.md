@@ -11,7 +11,7 @@ and warns only when the target removes a row or disables one the session current
 A switch that only adds rows applies immediately — switching to Creator mode is one example.
 Preset pairs are never listed in code, so custom presets and edited shipped presets follow the same rule.
 
-Requires DeepSeek Harness 0.2.2-rc.3 or newer and a deployment that composes Agent presets (the Web
+Requires DeepSeek Harness 0.2.2-rc.5 or newer and a deployment that composes Agent presets (the Web
 and Desktop profiles do).
 
 ## Install

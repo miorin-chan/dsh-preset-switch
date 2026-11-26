@@ -31,18 +31,20 @@ Web 客户端的 Remote 命名空间来自构建期的装配，第三方 bundle 
 ### Client：标题栏的 chevron
 
 组件注册在 `conversation.session.header.actions`，`order: -9`，紧跟官方只读模式名（`-10`）。
-它不覆盖官方注册、不读别人的 DOM，也不 import 私有 primitives；样式只用 `--dsw-alias-*` 主题 token，
-自带菜单与确认框的 markup。
+不覆盖官方注册、不读取其他插件的 DOM；下拉菜单、确认对话框、按钮、
+标签和箭头图标复用浏览器模块表提供的公开组件库 `@deepseek-ai/dsh-client-ui-primitives`（`Menu`、
+`MenuItemButton`、`Modal`、`Button`、`Tag`、`IconChevronDownOutlineRegular`），
+只保留触发器的悬停展开与弹层文本换行所需的少量 `--dsw-alias-*` 主题 token 样式。
 
 chevron 平时收起为零宽，悬停预设名或通过键盘聚焦按钮时，以 160ms 展开槽位并滑出箭头。
 样式用 CSS 模块类名识别紧邻的官方标签。无法识别标签、设备不支持悬停或有触屏等粗略指针时，入口常显。
 条目的负起始外边距抵消动作条引入的 10px 间隙。
 24×24px 按钮前的 4px 留白也属于条目的悬停区，指针可以从标签连续移到按钮。
-动画只偏移箭头图标，不偏移用于测量菜单锚点的按钮。
-菜单可见时跟随按钮的实际位置，避免标题栏因动画重新布局时菜单错位。
-菜单或确认框打开时也保持箭头可见，但只有指针悬停在按钮上时才显示高亮背景。
-弹层用 `react-dom` 的 `createPortal` 挂到 `document.body`：标题栏会裁剪并带有 transform，
-留在原地时 `position: fixed` 也可能被祖先的包含块约束。
+动画只偏移箭头图标，不偏移按钮本身。
+菜单使用 `Menu` 的 `portal` 模式并借助原生 CSS Anchor Positioning 锚定在触发器旁，
+避免标题栏裁剪与 transform 影响，标题栏动画重排时也会自动跟随对齐。
+确认框打开时自动收起菜单、交由 `Modal` 管理遮罩、聚焦和 Escape 返回。
+菜单或确认框打开时仍保持箭头可见，但只有指针悬停在按钮上时才显示高亮背景。
 组件在当前会话没有记录预设时隐藏，与官方标签一致。
 
 菜单数据来自 `agentPresets.list`，只列健康定义，排除当前模式；每次打开菜单都重读一次，

@@ -22,10 +22,10 @@
  * `tool-fs` read/write flags in the Minimal preset) still warns because the
  * same preset also drops rows; a preset that only narrows config would not.
  *
- * Dependencies: `react` from the shared browser module table. The Host
- * primitives package is intentionally not imported — its API is private to the
- * page build, and a throwing import would blank the header entry. The popover
- * and dialog therefore carry their own markup and theme-token styles.
+ * Dependencies: `react`, `react/jsx-runtime`, and `@deepseek-ai/dsh-client-ui-primitives`
+ * (`Menu`, `MenuItemButton`, `Modal`, `Button`, `Tag`, `IconChevronDownOutlineRegular`)
+ * from the shared browser module table. Only the header hover-reveal trigger
+ * and popup width/wrapping helpers carry plugin CSS via theme tokens.
  *
  * Fail-safe paths: an unavailable preset service hides the button; an
  * unreadable declaration cancels the switch instead of guessing; a rejected
@@ -33,6 +33,15 @@
  * the header.
  */
 
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import {
+  Button,
+  IconChevronDownOutlineRegular,
+  Menu,
+  MenuItemButton,
+  Modal,
+  Tag,
+} from '@deepseek-ai/dsh-client-ui-primitives'
 import type { Context } from '@deepseek-ai/cordis'
 import type { AgentPresetRow } from '@deepseek-ai/dsh-agent-preset-registry/types'
 import type { ClientRemote } from '@deepseek-ai/dsh-api-remotes/client'
@@ -46,9 +55,6 @@ import type { SlotRegistry } from '@deepseek-ai/dsh-client-ui-renderer/client'
 import type {} from '@deepseek-ai/dsh-client-ui-session/client'
 import type { PropsLocale, PropsRuntime, Translate, TranslateNS } from '@deepseek-ai/dsh-client-ui-slots'
 import type { SessionId } from '@deepseek-ai/dsh-session/types'
-import type * as React from 'react'
-
-type ReactModule = typeof React
 
 /**
  * The Client services this module consumes, named explicitly.
@@ -84,6 +90,7 @@ type LabelKey =
   | 'confirmDisabled'
   | 'confirmAdded'
   | 'confirmNote'
+  | 'confirmClose'
   | 'confirmCancel'
   | 'confirmApply'
   | 'switching'
@@ -122,6 +129,7 @@ const LABELS: Record<BuiltInLocaleId, Record<LabelKey, string>> & Record<LocaleI
     confirmDisabled: 'Disabled',
     confirmAdded: 'Added',
     confirmNote: 'Only later turns use the new mode. Earlier turns keep the tools they ran with.',
+    confirmClose: 'Close',
     confirmCancel: 'Cancel',
     confirmApply: 'Switch',
     switching: 'Switching…',
@@ -142,6 +150,7 @@ const LABELS: Record<BuiltInLocaleId, Record<LabelKey, string>> & Record<LocaleI
     confirmDisabled: '停用',
     confirmAdded: '新增',
     confirmNote: '只有之后的回合使用新模式；已有回合保留它们运行时的工具。',
+    confirmClose: '关闭',
     confirmCancel: '取消',
     confirmApply: '切换',
     switching: '正在切换…',
@@ -162,6 +171,7 @@ const LABELS: Record<BuiltInLocaleId, Record<LabelKey, string>> & Record<LocaleI
     confirmDisabled: '無効化',
     confirmAdded: '追加',
     confirmNote: '以降のターンのみ新しいモードを使用します。以前のターンは実行時のツールを保持します。',
+    confirmClose: '閉じる',
     confirmCancel: 'キャンセル',
     confirmApply: '切り替え',
     switching: '切り替え中…',
@@ -182,6 +192,7 @@ const LABELS: Record<BuiltInLocaleId, Record<LabelKey, string>> & Record<LocaleI
     confirmDisabled: 'Deaktiviert',
     confirmAdded: 'Hinzugefügt',
     confirmNote: 'Nur spätere Runden verwenden den neuen Modus. Frühere Runden behalten ihre Werkzeuge.',
+    confirmClose: 'Schließen',
     confirmCancel: 'Abbrechen',
     confirmApply: 'Wechseln',
     switching: 'Wird gewechselt…',
@@ -202,6 +213,7 @@ const LABELS: Record<BuiltInLocaleId, Record<LabelKey, string>> & Record<LocaleI
     confirmDisabled: 'Se desactiva',
     confirmAdded: 'Se añade',
     confirmNote: 'Solo los turnos posteriores usan el nuevo modo. Los turnos anteriores conservan sus herramientas.',
+    confirmClose: 'Cerrar',
     confirmCancel: 'Cancelar',
     confirmApply: 'Cambiar',
     switching: 'Cambiando…',
@@ -222,6 +234,7 @@ const LABELS: Record<BuiltInLocaleId, Record<LabelKey, string>> & Record<LocaleI
     confirmDisabled: 'Désactivé',
     confirmAdded: 'Ajouté',
     confirmNote: 'Seuls les tours suivants utilisent le nouveau mode. Les tours précédents conservent leurs outils.',
+    confirmClose: 'Fermer',
     confirmCancel: 'Annuler',
     confirmApply: 'Changer',
     switching: 'Changement…',
@@ -242,6 +255,7 @@ const LABELS: Record<BuiltInLocaleId, Record<LabelKey, string>> & Record<LocaleI
     confirmDisabled: 'Desativado',
     confirmAdded: 'Adicionado',
     confirmNote: 'Apenas os turnos seguintes usam o novo modo. Os turnos anteriores mantêm as ferramentas com que correram.',
+    confirmClose: 'Fechar',
     confirmCancel: 'Cancelar',
     confirmApply: 'Mudar',
     switching: 'A mudar…',
@@ -262,6 +276,7 @@ const LABELS: Record<BuiltInLocaleId, Record<LabelKey, string>> & Record<LocaleI
     confirmDisabled: 'Отключается',
     confirmAdded: 'Добавляется',
     confirmNote: 'Новый режим действует только для следующих ходов. Предыдущие ходы сохраняют свои инструменты.',
+    confirmClose: 'Закрыть',
     confirmCancel: 'Отмена',
     confirmApply: 'Переключить',
     switching: 'Переключение…',
@@ -269,21 +284,13 @@ const LABELS: Record<BuiltInLocaleId, Record<LabelKey, string>> & Record<LocaleI
   },
 }
 
-/**
- * Styles use only the theme tokens the shipped header and dialogs use, so
- * the control follows light and dark appearance without importing the
- * page's private primitives.
- */
 // The header slot renders the shipped AgentPresetLabel and this entry as siblings.
 // The label has no public DOM marker. If its CSS module class changes, keep the
 // switch visible so the picker still has a pointer-accessible entry point.
 const PRESET_LABEL = '.nIjNjW_label'
 
 const MENU_WIDTH = 320
-const MENU_GUTTER = 8
 
-// Surface, Button and Modal styling follows @deepseek-ai/dsh-client-ui-primitives
-// (DSH 0.2.2-rc.5, shipped dsh-web-frontend/dist/assets/index-CSAdOBx6.css).
 const STYLES = `
 .dshps-root {
   /* Cancel the strip's 10px gap so the 4px inset bridges the hover targets. */
@@ -305,7 +312,7 @@ const STYLES = `
   transition: color 120ms ease;
 }
 .dshps-chevron {
-  /* Move only the glyph: the menu measures the button, even mid-transition. */
+  /* Move only the glyph: the button bounds stay steady even mid-transition. */
   position: relative; inset-inline-start: calc(-8px * (1 - var(--dshps-revealed, 0)));
   pointer-events: none; opacity: var(--dshps-revealed, 0);
   transition: inset-inline-start 160ms ease, opacity 120ms ease;
@@ -327,60 +334,31 @@ const STYLES = `
 }
 .dshps-trigger:focus-visible { outline: 2px solid var(--dsw-alias-border-selected); outline-offset: -2px; }
 .dshps-trigger:disabled { cursor: default; color: var(--dsw-alias-label-dimmed); }
-.dshps-menu {
-  position: fixed; top: var(--dshps-menu-top); z-index: 1000;
-  left: clamp(${MENU_GUTTER}px, var(--dshps-menu-left), calc(100% - ${MENU_WIDTH + MENU_GUTTER}px));
-  width: min(${MENU_WIDTH}px, calc(100% - ${MENU_GUTTER * 2}px));
-  max-height: min(440px, calc(100dvh - var(--dshps-menu-top) - ${MENU_GUTTER}px));
-  overflow: auto; overscroll-behavior: contain; overflow-wrap: anywhere;
-  padding: 6px; box-sizing: border-box;
-  border-radius: var(--dsw-radius-md);
-  background: var(--dsw-menu-surface-fill, var(--dsw-alias-bg-layer-2));
-  backdrop-filter: var(--dsw-menu-backdrop-filter);
-  box-shadow: var(--dsw-elevation-panel, var(--dsw-shadow-lv2));
+.dshps-menu[role='menu'] {
+  width: min(${MENU_WIDTH}px, calc(100vw - 24px));
+  padding: 6px;
+  overflow-wrap: anywhere;
+}
+.dshps-menu [role='menuitem'] {
+  height: auto;
+  padding: 8px 10px;
+}
+.dshps-menu [role='menuitem'] > span {
+  overflow: visible;
+  text-overflow: clip;
+  white-space: normal;
 }
 .dshps-menu-head { padding: 6px 10px 8px; font-size: 12px; line-height: 16px; color: var(--dsw-alias-label-secondary); }
 .dshps-note { padding: 8px 10px; font-size: 13px; line-height: 18px; color: var(--dsw-alias-label-secondary); }
 .dshps-error { margin: 6px 4px 2px; padding: 8px 10px; border-radius: var(--dsw-radius-sm); font-size: 12px; line-height: 17px; color: var(--dsw-alias-state-error-primary); background: var(--dsw-alias-interactive-bg-hover-danger); }
-.dshps-item {
-  display: flex; flex-direction: column; gap: 2px; width: 100%;
-  padding: 8px 10px; border: none; border-radius: var(--dsw-radius-sm);
-  background: transparent; font-family: inherit; text-align: start; cursor: pointer;
-}
-@media (hover: hover) { .dshps-item:hover:not(:disabled) { background: var(--dsw-alias-interactive-bg-hover); } }
-.dshps-item:focus-visible { outline: 2px solid var(--dsw-alias-border-selected); outline-offset: -2px; }
-.dshps-item:disabled { cursor: default; opacity: 0.6; }
+.dshps-item { display: flex; flex-direction: column; gap: 2px; white-space: normal; overflow-wrap: anywhere; }
 .dshps-item-name { font-size: 13px; line-height: 20px; color: var(--dsw-alias-label-primary); }
 .dshps-item-desc { font-size: 12px; line-height: 16px; color: var(--dsw-alias-label-secondary); }
-.dshps-backdrop {
-  position: fixed; inset: 0; z-index: 1100; display: flex; align-items: center; justify-content: center;
-  padding: clamp(8px, 5vmin, 24px); background: var(--dsw-alias-bg-mask-1);
-}
-.dshps-dialog {
-  display: flex; flex-direction: column; width: min(440px, 100%); max-height: 100%;
-  overflow: hidden; box-sizing: border-box; border-radius: var(--dsw-radius-panel, var(--dsw-radius-lg));
-  background: var(--dsw-alias-bg-layer-2); box-shadow: var(--dsw-elevation-prominent, var(--dsw-shadow-lv3));
-  overflow-wrap: anywhere;
-}
-.dshps-dialog-content { min-height: 0; overflow: auto; overscroll-behavior: contain; padding: 22px 24px 0; }
-.dshps-dialog-title { margin: 0; font-size: 16px; line-height: 24px; font-weight: 500; color: var(--dsw-alias-label-primary); }
-.dshps-dialog-note { margin: 8px 0 0; font-size: 14px; line-height: 22px; color: var(--dsw-alias-label-secondary); }
-.dshps-section { margin-top: 14px; }
+.dshps-section + .dshps-section { margin-top: 12px; }
 .dshps-section-title { font-size: 12px; line-height: 16px; font-weight: 500; color: var(--dsw-alias-label-secondary); }
 .dshps-chips { display: flex; flex-wrap: wrap; gap: 6px; margin: 6px 0 0; padding: 0; list-style: none; }
-.dshps-chip { min-width: 0; padding: 2px 7px; border-radius: var(--dsw-radius-xs); background: var(--dsw-alias-interactive-bg-hover); font-size: 12px; line-height: 18px; color: var(--dsw-alias-label-secondary); }
-.dshps-chip[data-kind='loss'] { color: var(--dsw-alias-state-error-primary); }
-.dshps-actions { display: flex; flex: none; flex-wrap: wrap; justify-content: flex-end; gap: 8px; padding: 16px 24px 24px; }
-.dshps-button {
-  min-height: 36px; max-width: 100%; padding: 4px 14px; border: 0; border-radius: var(--dsw-radius-md);
-  background: transparent; color: var(--dsw-alias-label-primary);
-  font-family: inherit; font-size: 14px; line-height: 22px; cursor: pointer;
-}
-@media (hover: hover) { .dshps-button:hover:not(:disabled) { background: var(--dsw-alias-interactive-bg-hover); } }
-.dshps-button:disabled { cursor: default; opacity: 0.6; }
-.dshps-button-primary { background: var(--dsw-alias-button-primary-fill); color: var(--dsw-alias-label-primary-foreground); }
-@media (hover: hover) { .dshps-button-primary:hover:not(:disabled) { background: var(--dsw-alias-button-primary-hover); } }
-.dshps-button:focus-visible { outline: 2px solid var(--dsw-alias-border-selected); outline-offset: 2px; }
+.dshps-chips > li { min-width: 0; max-width: 100%; }
+.dshps-tag { max-width: 100%; overflow: hidden; text-overflow: ellipsis; }
 `
 
 /**
@@ -418,37 +396,6 @@ type RosterState =
 interface ConfirmState {
   readonly preset: AgentPresetRow
   readonly impact: CompositionImpact
-}
-
-/** Menu anchor in viewport coordinates. */
-interface MenuAnchor {
-  readonly top: number
-  readonly left: number
-}
-
-function menuAnchor(trigger: HTMLButtonElement): MenuAnchor {
-  const rect = trigger.getBoundingClientRect()
-  return { top: rect.bottom + 6, left: rect.left }
-}
-
-function trackMenuAnchor(
-  trigger: HTMLButtonElement,
-  update: (anchor: MenuAnchor) => void,
-  view: Pick<Window, 'requestAnimationFrame' | 'cancelAnimationFrame'>,
-): () => void {
-  // The strip can shift the entire button when this or a neighboring slot animates.
-  // Follow its viewport position only while the portaled menu is open.
-  let previous: MenuAnchor | undefined
-  const tick = (): void => {
-    const next = menuAnchor(trigger)
-    if (previous === undefined || next.top !== previous.top || next.left !== previous.left) {
-      previous = next
-      update(next)
-    }
-    frame = view.requestAnimationFrame(tick)
-  }
-  let frame = view.requestAnimationFrame(tick)
-  return () => { view.cancelAnimationFrame(frame) }
 }
 
 /**
@@ -609,69 +556,6 @@ function translator(labels: Readonly<Record<string, string>>): Translate {
   }
 }
 
-/** Global, once per module: React absence is a page-build problem, not a switch problem. */
-let warnedMissingReact = false
-/** @param message - single diagnostic for a missing shared module. */
-function warnMissingReact(message: string): void {
-  if (warnedMissingReact) return
-  warnedMissingReact = true
-  console.warn(`[${NS}] ${message}`)
-}
-
-/**
- * Whether a value is the shared `react` module: the hooks and element factory
- * this module uses, probed rather than asserted so a page build that seeds a
- * different shape falls back to the disabled-header warning.
- * @param value - the value the module table returned for `react`.
- */
-function isReactModule(value: unknown): value is ReactModule {
-  if (typeof value !== 'object' || value === null) return false
-  if (!('createElement' in value) || typeof value.createElement !== 'function') return false
-  if (!('useState' in value) || typeof value.useState !== 'function') return false
-  if (!('useEffect' in value) || typeof value.useEffect !== 'function') return false
-  if (!('useRef' in value) || typeof value.useRef !== 'function') return false
-  if (!('useMemo' in value) || typeof value.useMemo !== 'function') return false
-  return true
-}
-
-/**
- * Read the shared `react` module the shell seeds into the module table.
- * @returns the module, or undefined when the page build did not seed it.
- */
-function loadReact(): ReactModule | undefined {
-  try {
-    const loaded = require('react')
-    return isReactModule(loaded) ? loaded : undefined
-  } catch {
-    return undefined
-  }
-}
-
-const react = loadReact()
-
-/** The static `react-dom` module's portal factory, narrowed to what this module calls. */
-interface ReactDomModule {
-  readonly createPortal: (children: React.ReactNode, container: Element) => React.ReactNode
-}
-
-/**
- * Read the shared `react-dom` module for `createPortal`. The header clips its
- * layout, so the menu and dialog mount on `document.body` instead of inheriting
- * that box.
- * @returns the portal factory, or undefined when the page does not seed it.
- */
-function loadReactDom(): ReactDomModule | undefined {
-  try {
-    const loaded: unknown = require('react-dom')
-    if (typeof loaded !== 'object' || loaded === null || !('createPortal' in loaded)) return undefined
-    return typeof loaded.createPortal === 'function' ? loaded as ReactDomModule : undefined
-  } catch {
-    return undefined
-  }
-}
-
-const reactDom = loadReactDom()
-
 /**
  * Read one preset's declared composition.
  * @param ctx - Client context.
@@ -687,27 +571,23 @@ async function readComposition(ctx: ClientContext, id: string): Promise<string> 
 /** Build the header component. The context stays in the closure because the
  * slot registration owns the component's lifetime; every Remote service call
  * is effect-safe and can fail into a visible message. */
-function createModeButton(ctx: ClientContext, reactModule: ReactModule) {
-  return function ModeButton(props: ModeButtonProps): React.ReactNode {
+function createModeButton(ctx: ClientContext) {
+  return function ModeButton(props: ModeButtonProps): ReactNode {
     const t: TranslateNS<typeof NS> = typeof props.t === 'function' ? props.t : translator(LABELS.en)
     const sessionId = props.sessionId
     // The per-session projection updates before the session list summary.
     const currentPresetId = props.useProjection('agentPreset')
     const hasPreset = typeof currentPresetId === 'string'
 
-    const [open, setOpen] = reactModule.useState(false)
-    const [anchor, setAnchor] = reactModule.useState<MenuAnchor | null>(null)
-    const [roster, setRoster] = reactModule.useState<RosterState>({ status: 'loading' })
-    const [busy, setBusy] = reactModule.useState(false)
-    const [error, setError] = reactModule.useState<string | null>(null)
-    const [confirm, setConfirm] = reactModule.useState<ConfirmState | null>(null)
-    const rootRef = reactModule.useRef<HTMLSpanElement>(null)
-    const triggerRef = reactModule.useRef<HTMLButtonElement>(null)
-    const menuRef = reactModule.useRef<HTMLDivElement>(null)
-    const dialogRef = reactModule.useRef<HTMLDivElement>(null)
-    const cancelRef = reactModule.useRef<HTMLButtonElement>(null)
+    const [open, setOpen] = useState(false)
+    const [roster, setRoster] = useState<RosterState>({ status: 'loading' })
+    const [busy, setBusy] = useState(false)
+    const [error, setError] = useState<string | null>(null)
+    const [confirm, setConfirm] = useState<ConfirmState | null>(null)
+    const rootRef = useRef<HTMLSpanElement>(null)
+    const triggerRef = useRef<HTMLButtonElement>(null)
 
-    reactModule.useEffect(() => {
+    useEffect(() => {
       // Read the roster each time the menu opens: the first attempt may have
       // raced the Remote namespace, and a shipped preset can appear or break
       // while the conversation stays open.
@@ -733,40 +613,8 @@ function createModeButton(ctx: ClientContext, reactModule: ReactModule) {
       return () => { alive = false }
     }, [open])
 
-    reactModule.useEffect(() => {
-      if (!open) return undefined
-      const onPointer = (event: PointerEvent): void => {
-        const target = event.target
-        if (!(target instanceof Node)) return
-        const inside = rootRef.current?.contains(target) === true
-          || menuRef.current?.contains(target) === true
-          || dialogRef.current?.contains(target) === true
-        if (!inside) setOpen(false)
-      }
-      const onKey = (event: KeyboardEvent): void => {
-        if (event.key !== 'Escape') return
-        if (confirm !== null) setConfirm(null)
-        else setOpen(false)
-      }
-      document.addEventListener('pointerdown', onPointer, true)
-      document.addEventListener('keydown', onKey)
-      return () => {
-        document.removeEventListener('pointerdown', onPointer, true)
-        document.removeEventListener('keydown', onKey)
-      }
-    }, [open, confirm])
-
-    reactModule.useEffect(() => {
-      if (!open || !hasPreset || confirm !== null || triggerRef.current === null) return undefined
-      return trackMenuAnchor(triggerRef.current, setAnchor, window)
-    }, [open, hasPreset, confirm])
-
-    reactModule.useEffect(() => {
-      if (confirm !== null) cancelRef.current?.focus()
-    }, [confirm])
-
     /** The shipped dictionary gives built-in presets their localized names. */
-    const officialT = reactModule.useMemo((): Translate | undefined => {
+    const officialT = useMemo((): Translate | undefined => {
       try { return ctx.locale.bind('settings.agentPreset') } catch { return undefined }
     }, [])
     const officialText = (key: string): string | undefined => {
@@ -800,7 +648,6 @@ function createModeButton(ctx: ClientContext, reactModule: ReactModule) {
         return
       }
       setError(null)
-      setAnchor(menuAnchor(triggerRef.current))
       // Reset before the first open render, while the roster read runs in the effect.
       setRoster({ status: 'loading' })
       setOpen(true)
@@ -858,138 +705,106 @@ function createModeButton(ctx: ClientContext, reactModule: ReactModule) {
     // when the deployment composes no presets or the session records none.
     if (!hasPreset) return null
 
+    const menuOpen = open && confirm === null
     const others = roster.status === 'ready' ? roster.presets.filter(preset => preset.id !== currentPresetId) : []
-    const menu = open && anchor !== null
-      ? reactModule.createElement('div', {
-        className: 'dshps-menu',
-        ref: menuRef,
-        role: 'menu',
-        'aria-label': t('menuTitle'),
-        hidden: confirm !== null,
-        style: {
-          '--dshps-menu-top': `${anchor.top}px`,
-          '--dshps-menu-left': `${anchor.left}px`,
-        } as React.CSSProperties,
-      },
-      reactModule.createElement('div', { className: 'dshps-menu-head' }, t('menuTitle')),
-      roster.status === 'loading' && reactModule.createElement('div', { className: 'dshps-note' }, t('loading')),
-      roster.status === 'error' && reactModule.createElement('div', { className: 'dshps-note' }, t('loadFailed')),
-      roster.status === 'error' && reactModule.createElement('div', { className: 'dshps-error', role: 'alert' }, roster.error),
-      roster.status === 'ready' && others.length === 0 && reactModule.createElement('div', { className: 'dshps-note' }, t('empty')),
-      others.map(preset => reactModule.createElement('button', {
-        key: preset.id,
-        type: 'button',
-        role: 'menuitem',
-        className: 'dshps-item',
-        disabled: busy,
-        onClick: () => { void choose(preset) },
-      },
-      reactModule.createElement('span', { className: 'dshps-item-name' }, nameOf(preset)),
-      reactModule.createElement('span', { className: 'dshps-item-desc' }, descriptionOf(preset)))),
-      busy && reactModule.createElement('div', { className: 'dshps-note' }, t('switching')),
-      error !== null && reactModule.createElement('div', { className: 'dshps-error', role: 'alert' }, error))
-      : null
+    const trigger = (
+      <button
+        ref={triggerRef}
+        type="button"
+        className="dshps-trigger"
+        title={t('triggerTitle')}
+        aria-label={t('triggerTitle')}
+        aria-haspopup="menu"
+        aria-expanded={menuOpen}
+        disabled={busy}
+        onClick={toggle}
+      >
+        <IconChevronDownOutlineRegular size={14} className="dshps-chevron" />
+      </button>
+    )
 
-    const dialog = confirm === null
-      ? null
-      : reactModule.createElement('div', {
-        className: 'dshps-backdrop',
-        ref: dialogRef,
-        onMouseDown: (event: React.MouseEvent<HTMLDivElement>) => {
-          if (event.target === event.currentTarget) setConfirm(null)
-        },
-      },
-      reactModule.createElement('div', {
-        className: 'dshps-dialog',
-        role: 'dialog',
-        'aria-modal': 'true',
-        'aria-labelledby': 'dshps-confirm-title',
-      },
-      reactModule.createElement('div', { className: 'dshps-dialog-content' },
-        reactModule.createElement('h2', { className: 'dshps-dialog-title', id: 'dshps-confirm-title' },
-          t('confirmTitle', { name: nameOf(confirm.preset) })),
-        reactModule.createElement('p', { className: 'dshps-dialog-note' }, t('confirmNote')),
-        confirm.impact.removed.length > 0 && reactModule.createElement('div', { className: 'dshps-section' },
-          reactModule.createElement('div', { className: 'dshps-section-title' }, t('confirmRemoved')),
-          reactModule.createElement('ul', { className: 'dshps-chips' },
-            confirm.impact.removed.map(row => reactModule.createElement('li', {
-              key: row.key,
-              className: 'dshps-chip',
-              'data-kind': 'loss',
-            }, rowLabel(row))))),
-        confirm.impact.disabled.length > 0 && reactModule.createElement('div', { className: 'dshps-section' },
-          reactModule.createElement('div', { className: 'dshps-section-title' }, t('confirmDisabled')),
-          reactModule.createElement('ul', { className: 'dshps-chips' },
-            confirm.impact.disabled.map(row => reactModule.createElement('li', {
-              key: row.key,
-              className: 'dshps-chip',
-              'data-kind': 'loss',
-            }, rowLabel(row))))),
-        confirm.impact.added.length > 0 && reactModule.createElement('div', { className: 'dshps-section' },
-          reactModule.createElement('div', { className: 'dshps-section-title' }, t('confirmAdded')),
-          reactModule.createElement('ul', { className: 'dshps-chips' },
-            confirm.impact.added.map(row => reactModule.createElement('li', {
-              key: row.key,
-              className: 'dshps-chip',
-            }, rowLabel(row)))))),
-      reactModule.createElement('div', { className: 'dshps-actions' },
-        reactModule.createElement('button', {
-          ref: cancelRef,
-          type: 'button',
-          className: 'dshps-button',
-          disabled: busy,
-          onClick: () => { setConfirm(null) },
-        }, t('confirmCancel')),
-        reactModule.createElement('button', {
-          type: 'button',
-          className: 'dshps-button dshps-button-primary',
-          disabled: busy,
-          onClick: () => { void apply() },
-        }, busy ? t('switching') : t('confirmApply')))))
+    const impactGroups = confirm === null
+      ? []
+      : ([
+          { key: 'confirmRemoved', rows: confirm.impact.removed, tone: 'danger' },
+          { key: 'confirmDisabled', rows: confirm.impact.disabled, tone: 'danger' },
+          { key: 'confirmAdded', rows: confirm.impact.added, tone: 'neutral' },
+        ] as const).filter(group => group.rows.length > 0)
 
-    // The header animates and clips its actions row, so a `position: fixed`
-    // child is still at the mercy of an ancestor transform. Mounting the
-    // popups on `document.body` keeps them outside that box entirely.
-    const mount = (node: React.ReactNode): React.ReactNode => {
-      if (node === null) return null
-      if (typeof document === 'undefined' || reactDom === undefined) return node
-      return reactDom.createPortal(node, document.body)
-    }
-
-    return reactModule.createElement('span', {
-      className: 'dshps-root',
-      ref: rootRef,
-      'data-open': open || confirm !== null,
-    },
-      reactModule.createElement('style', null, STYLES),
-      reactModule.createElement('button', {
-        ref: triggerRef,
-        type: 'button',
-        className: 'dshps-trigger',
-        title: t('triggerTitle'),
-        'aria-label': t('triggerTitle'),
-        'aria-haspopup': 'menu',
-        'aria-expanded': open && anchor !== null,
-        disabled: busy,
-        onClick: toggle,
-      },
-      reactModule.createElement('svg', {
-        className: 'dshps-chevron',
-        width: 14,
-        height: 14,
-        viewBox: '0 0 16 16',
-        'aria-hidden': 'true',
-      },
-      reactModule.createElement('path', {
-        d: 'M4 6l4 4 4-4',
-        fill: 'none',
-        stroke: 'currentColor',
-        strokeWidth: 1.5,
-        strokeLinecap: 'round',
-        strokeLinejoin: 'round',
-      }))),
-      mount(menu),
-      mount(dialog))
+    return (
+      <span className="dshps-root" ref={rootRef} data-open={open || confirm !== null}>
+        <style>{STYLES}</style>
+        <Menu
+          open={menuOpen}
+          onClose={close}
+          portal
+          align="start"
+          side="bottom"
+          listClassName="dshps-menu"
+          anchor={trigger}
+        >
+          <div className="dshps-menu-head">{t('menuTitle')}</div>
+          {roster.status === 'loading' && <div className="dshps-note">{t('loading')}</div>}
+          {roster.status === 'error' && <div className="dshps-note">{t('loadFailed')}</div>}
+          {roster.status === 'error' && <div className="dshps-error" role="alert">{roster.error}</div>}
+          {roster.status === 'ready' && others.length === 0 && <div className="dshps-note">{t('empty')}</div>}
+          {others.map(preset => (
+            <MenuItemButton
+              key={preset.id}
+              disabled={busy}
+              onSelect={() => { void choose(preset) }}
+            >
+              <span className="dshps-item">
+                <span className="dshps-item-name">{nameOf(preset)}</span>
+                <span className="dshps-item-desc">{descriptionOf(preset)}</span>
+              </span>
+            </MenuItemButton>
+          ))}
+          {busy && <div className="dshps-note">{t('switching')}</div>}
+          {error !== null && <div className="dshps-error" role="alert">{error}</div>}
+        </Menu>
+        <Modal
+          open={confirm !== null}
+          onClose={() => { setConfirm(null) }}
+          title={confirm !== null ? t('confirmTitle', { name: nameOf(confirm.preset) }) : ''}
+          closeLabel={t('confirmClose')}
+          tone="warning"
+          description={t('confirmNote')}
+          footer={(
+            <>
+              <Button
+                variant="ghost"
+                disabled={busy}
+                data-modal-autofocus=""
+                onClick={() => { setConfirm(null) }}
+              >
+                {t('confirmCancel')}
+              </Button>
+              <Button
+                variant="primary"
+                disabled={busy}
+                onClick={() => { void apply() }}
+              >
+                {busy ? t('switching') : t('confirmApply')}
+              </Button>
+            </>
+          )}
+        >
+          {impactGroups.map(group => (
+            <div key={group.key} className="dshps-section">
+              <div className="dshps-section-title">{t(group.key)}</div>
+              <ul className="dshps-chips">
+                {group.rows.map(row => (
+                  <li key={row.key}>
+                    <Tag tone={group.tone} className="dshps-tag">{rowLabel(row)}</Tag>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ))}
+        </Modal>
+      </span>
+    )
   }
 }
 
@@ -1002,18 +817,14 @@ export const inject = ['locale', 'slots', 'sessions', 'inputTriggers', 'remote',
 export function apply(ctx: ClientContext): void {
   ctx.effect(() => ctx.locale.register(NS, LABELS), `${NS}: locale`)
   ctx.effect(() => ctx.inputTriggers.registerSource(presetSwitchAlias(ctx.locale, ctx.sessions)), `${NS}: command alias`)
-  if (react === undefined) {
-    warnMissingReact('the shared react module is unavailable; the header switch is disabled')
-    return
-  }
   ctx.effect(() => ctx.slots.inject('conversation.session.header.actions', () => ctx.slots.register({
     name: 'conversation.session.header.actions',
     id: 'preset-switch',
     // The shipped preset label sits at -10; the chevron follows it.
     order: -9,
     locale: NS,
-  }, createModeButton(ctx, react))), `${NS}: header action`)
+  }, createModeButton(ctx))), `${NS}: header action`)
 }
 
 // Exposed for the node test only; the page never reads this field.
-export const internals = { parseComposition, diffCompositions, rowLabel, shortModule, trackMenuAnchor }
+export const internals = { parseComposition, diffCompositions, rowLabel, shortModule }

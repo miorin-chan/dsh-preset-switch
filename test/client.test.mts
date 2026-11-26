@@ -14,16 +14,38 @@ await import('../client.js')
 
 assert.equal(registration.id, '@miorin/dsh-preset-switch')
 
-/** A React stub: enough for the component's first render, no page needed. */
+const Fragment = Symbol.for('react.fragment')
+function makeElement(type, props = {}, key) {
+  const raw = props?.children
+  const children = raw === undefined ? [] : Array.isArray(raw) ? raw.flat() : [raw]
+  const finalProps = key === undefined ? (props ?? {}) : { ...(props ?? {}), key }
+  return { type, props: finalProps, children }
+}
+
+/** React, jsx-runtime, and primitives stubs: enough for component trees, no page needed. */
 const reactStub = {
-  createElement: (type, props, ...children) => ({ type, props: props ?? {}, children }),
-  useState: value => [value, () => undefined],
+  useState: value => [typeof value === 'function' ? value() : value, () => undefined],
   useEffect: () => undefined,
   useRef: () => ({ current: null }),
   useMemo: factory => factory(),
 }
+const jsxRuntimeStub = {
+  Fragment,
+  jsx: makeElement,
+  jsxs: makeElement,
+}
+const primitivesStub = {
+  Button: props => makeElement('Button', props),
+  IconChevronDownOutlineRegular: props => makeElement('IconChevronDownOutlineRegular', props),
+  Menu: props => makeElement('Menu', props),
+  MenuItemButton: props => makeElement('MenuItemButton', props),
+  Modal: props => makeElement('Modal', props),
+  Tag: props => makeElement('Tag', props),
+}
 const plugin = registration.factory(name => {
   if (name === 'react') return reactStub
+  if (name === 'react/jsx-runtime') return jsxRuntimeStub
+  if (name === '@deepseek-ai/dsh-client-ui-primitives') return primitivesStub
   throw new Error(`unexpected module ${name}`)
 })
 
@@ -247,20 +269,25 @@ test('renders the header chevron only when the session records a preset', () => 
   const tree = Component({ sessionId: 'session-1', t: key => key, useProjection: () => 'standard' })
   assert.equal(tree.type, 'span')
   assert.equal(tree.props['data-open'], false, 'the picker starts closed')
-  const trigger = tree.children.find(child => child?.props?.className === 'dshps-trigger')
+  const menu = tree.children.find(child => child?.type === primitivesStub.Menu)
+  assert.ok(menu, 'wraps the trigger in a native Menu')
+  const trigger = menu.props.anchor
   assert.ok(trigger, 'the chevron button renders beside the shipped label')
+  assert.equal(trigger.props.className, 'dshps-trigger')
   assert.equal(trigger.props['aria-haspopup'], 'menu')
   assert.equal(trigger.props['aria-expanded'], false)
   const [glyph] = trigger.children
+  assert.equal(glyph.type, primitivesStub.IconChevronDownOutlineRegular)
   assert.equal(glyph.props.className, 'dshps-chevron', 'only the glyph moves within the button')
-  assert.equal(glyph.props['aria-hidden'], 'true')
+  assert.equal(glyph.props.size, 14)
+  assert.equal('aria-hidden' in glyph.props, false, 'omits aria-hidden because IconProps excludes it')
 })
 
 test('reopening waits for the roster and excludes the live preset even if the summary is stale', (t) => {
   const { ctx, slots } = fakeContext()
   plugin.apply(ctx)
   const roster = { status: 'ready', presets: [{ id: 'standard' }, { id: 'cordis' }] }
-  const state = [false, null, roster]
+  const state = [false, roster]
   let nextState = 0
   let nextRef = 0
   t.mock.method(reactStub, 'useState', initial => {
@@ -287,24 +314,28 @@ test('reopening waits for the roster and excludes the live preset even if the su
     nextRef = 0
     return slots[0].component(props)
   }
+  const menuOf = tree => tree.children.find(child => child?.type === primitivesStub.Menu)
+  const triggerOf = tree => menuOf(tree)?.props?.anchor
   const menuRows = () => {
-    const menu = render().children.find(child => child?.props?.role === 'menu')
+    const menu = menuOf(render())
     assert.ok(menu)
-    return menu.children.flat().filter(child => child?.props?.role === 'menuitem').map(child => child.props.key)
+    return menu.children.flat().filter(child => child?.type === primitivesStub.MenuItemButton).map(child => child.props.key)
   }
 
-  const trigger = render().children.find(child => child?.props?.className === 'dshps-trigger')
+  const trigger = triggerOf(render())
   assert.equal(trigger.props.ref, buttonRef)
   trigger.props.onClick()
   const opened = render()
+  const openMenu = menuOf(opened)
   assert.equal(opened.props['data-open'], true, 'the chevron stays revealed once the picker opens')
-  assert.equal(opened.children.find(child => child?.props?.className === 'dshps-trigger').props['aria-expanded'], true)
-  assert.deepEqual(opened.children.find(child => child?.props?.role === 'menu').props.style, {
-    '--dshps-menu-top': '30px',
-    '--dshps-menu-left': '100px',
-  }, 'opening anchors the menu to the button’s box')
+  assert.equal(triggerOf(opened).props['aria-expanded'], true)
+  assert.equal(openMenu.props.open, true)
+  assert.equal(openMenu.props.portal, true)
+  assert.equal(openMenu.props.align, 'start')
+  assert.equal(openMenu.props.side, 'bottom')
+  assert.equal(openMenu.props.listClassName, 'dshps-menu')
   assert.deepEqual(menuRows(), [], 'the first render after opening cannot use the previous roster')
-  state[2] = roster
+  state[1] = roster
   assert.deepEqual(menuRows(), ['standard'], 'the current preset is excluded as soon as the roster arrives')
 })
 
@@ -341,43 +372,87 @@ test('slides the clipped slot and glyph without moving or highlighting the butto
   assert.match(styles, /@media \(prefers-reduced-motion: reduce\) \{\s*\.dshps-root, \.dshps-chevron \{ transition: none; \}/)
 })
 
-test('follows button movement while the menu is open and cancels the pending frame on close', () => {
-  const frames = new Map<number, () => void>()
-  let nextFrame = 0
-  const view = {
-    requestAnimationFrame(callback) {
-      frames.set(++nextFrame, callback)
-      return nextFrame
-    },
-    cancelAnimationFrame(frame) { frames.delete(frame) },
-  }
-  const advance = () => {
-    const [frame, callback] = [...frames.entries()][0]
-    frames.delete(frame)
-    callback()
-  }
-  let rect = { left: 100, bottom: 24 }
-  const button = { getBoundingClientRect: () => rect }
-  const updates = []
-  const stop = plugin.internals.trackMenuAnchor(button, anchor => updates.push(anchor), view)
-  advance()
-  rect = { left: 83, bottom: 24 }
-  advance()
-  advance()
-  rect = { left: 83, bottom: 20 }
-  advance()
-  assert.deepEqual(updates, [{ left: 100, top: 30 }, { left: 83, top: 30 }, { left: 83, top: 26 }])
-  stop()
-  assert.equal(frames.size, 0)
-})
-
-test('uses the host primary button foreground in the confirmation dialog', () => {
+test('closes Menu when Modal opens and uses native Tag tones and Button variants', () => {
   const { ctx, slots } = fakeContext()
   plugin.apply(ctx)
+  const roster = { status: 'ready', presets: [{ id: 'standard' }, { id: 'minimal', name: 'Minimal' }] }
+  const state = [
+    true,
+    roster,
+    false,
+    null,
+    {
+      preset: { id: 'minimal', name: 'Minimal' },
+      impact: {
+        removed: [{ key: 'tool-fs', id: 'tool-fs', disabled: false }],
+        disabled: [{ key: 'subagents', id: 'subagents', disabled: true }],
+        added: [{ key: 'extra', id: 'extra', disabled: false }],
+      },
+    },
+  ]
+  const renderWithState = () => {
+    let nextState = 0
+    reactStub.useState = initial => {
+      const index = nextState++
+      if (index >= state.length) return [initial, () => undefined]
+      return [state[index], update => {
+        state[index] = typeof update === 'function' ? update(state[index]) : update
+      }]
+    }
+    return slots[0].component({ sessionId: 'session-1', t: key => key, useProjection: () => 'standard' })
+  }
+  const origUseState = reactStub.useState
+  try {
+    const tree = renderWithState()
+    assert.equal(tree.props['data-open'], true)
+    const menu = tree.children.find(child => child?.type === primitivesStub.Menu)
+    assert.equal(menu.props.open, false, 'menu closes while confirmation modal is active')
+    assert.equal(menu.props.anchor.props['aria-expanded'], false)
+
+    const modal = tree.children.find(child => child?.type === primitivesStub.Modal)
+    assert.ok(modal)
+    assert.equal(modal.props.open, true)
+    assert.equal(modal.props.tone, 'warning')
+    assert.equal(modal.props.closeLabel, 'confirmClose')
+    assert.equal(modal.props.description, 'confirmNote')
+
+    const collect = (node, type, out = []) => {
+      if (!node || typeof node !== 'object') return out
+      if (Array.isArray(node)) {
+        for (const item of node) collect(item, type, out)
+        return out
+      }
+      if (node.type === type) out.push(node)
+      collect(node.children, type, out)
+      return out
+    }
+    const tags = collect(modal.children, primitivesStub.Tag)
+    assert.deepEqual(tags.map(tag => tag.props.tone), ['danger', 'danger', 'neutral'])
+    const footerTree = makeElement('footer', { children: modal.props.footer })
+    const buttons = collect(footerTree, primitivesStub.Button)
+    assert.equal(buttons.length, 2)
+    assert.equal(buttons[0].props.variant, 'ghost')
+    assert.equal(buttons[0].props['data-modal-autofocus'], '')
+    assert.equal(buttons[1].props.variant, 'primary')
+
+    buttons[0].props.onClick()
+    assert.equal(state[4], null, 'Cancel dismisses confirmation and returns to open menu')
+  } finally {
+    reactStub.useState = origUseState
+  }
+})
+
+test('supplies confirmClose in every locale and omits manual popup styles', () => {
+  const { ctx, slots, registered } = fakeContext()
+  plugin.apply(ctx)
+  const dict = registered.get('dsh-preset-switch')
+  assert.equal(Object.keys(dict).length, 8)
+  for (const [locale, entry] of Object.entries(dict)) {
+    assert.ok(typeof entry.confirmClose === 'string' && entry.confirmClose.trim().length > 0, `${locale} confirmClose`)
+  }
   const tree = slots[0].component({ sessionId: 'session-1', t: key => key, useProjection: () => 'standard' })
   const [styles] = tree.children.find(child => child?.type === 'style').children
-  const primaryButton = styles.match(/\.dshps-button-primary \{([^}]+)\}/)?.[1]
-  assert.match(primaryButton ?? '', /color:\s*var\(--dsw-alias-label-primary-foreground\)/)
+  assert.doesNotMatch(styles, /\.dshps-(?:backdrop|dialog|button|chip)\b/)
 })
 
 test('renders nothing when the preset projection is null', () => {
