@@ -14,6 +14,15 @@ Preset pairs are never listed in code, so custom presets and edited shipped pres
 Requires DeepSeek Harness 0.2.2-rc.5 or newer and a deployment that composes Agent presets (the Web
 and Desktop profiles do).
 
+## Screenshots
+
+The DeepSeek Harness interface is shown in Chinese.
+
+![Preset switch confirmation listing the plugin rows to remove or add](docs/assets/screenshots/main-light.png)
+
+- Mode picker · [Light](docs/assets/screenshots/entry-light.png) · [Dark](docs/assets/screenshots/entry-dark.png)
+- Switch confirmation · [Light](docs/assets/screenshots/main-light.png) · [Dark](docs/assets/screenshots/main-dark.png)
+
 ## Install
 
 Run `pnpm install --frozen-lockfile` in a fresh checkout to install dependencies and build the plugin.

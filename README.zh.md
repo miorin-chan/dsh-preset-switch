@@ -11,6 +11,13 @@
 
 需要 DeepSeek Harness 0.2.2-rc.5 或更新版本，且部署装配了 Agent preset（Web 与桌面 profile 默认如此）。
 
+## 实拍截图
+
+![切换模式的确认框列出将移除及新增的插件行](docs/assets/screenshots/main-light.png)
+
+- 模式列表 · [浅色](docs/assets/screenshots/entry-light.png) · [深色](docs/assets/screenshots/entry-dark.png)
+- 切换确认 · [浅色](docs/assets/screenshots/main-light.png) · [深色](docs/assets/screenshots/main-dark.png)
+
 ## 安装
 
 在新检出的目录中运行 `pnpm install --frozen-lockfile` 安装依赖并构建插件。
