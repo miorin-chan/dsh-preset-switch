@@ -32,3 +32,4 @@ Host 命令接受任意已声明、可挂载的 `preset-id`，不重复 Client �
   点击目标后通过 `agentPresets.read` 读取当前与目标声明，
   解析 Loader 的 entry-list YAML（跳过 `name: cordis:group` 与无身份行，优先按 `id` 再按模块名匹配，
   `disabled: true` 记停用、`!!js` 条件视为启用），分出目标新增、目标缺失与目标停用三类结果决定是否弹窗。
+- 仅修改 `config` 的行不计入移除或停用提示；命令行执行结果跟随在「设置」中手动选定的语言，自动跟随浏览器语言时回退英文。
