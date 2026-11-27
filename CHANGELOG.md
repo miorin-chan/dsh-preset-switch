@@ -5,6 +5,13 @@
 - Localize the `/preset-switch` description, argument hint, usage, and results in eight languages.
   The command follows the saved language preference, with English as the fallback.
 - Offer localized command names in the typed slash menu, and accept them as alternatives to `/preset-switch`.
+- Open the picker 6px below the chevron by capping its top margin at the trigger:
+  the window frame's overlay top (48px clearance + 20px on macOS)
+  otherwise parks the menu a header's height below the control.
+- Draw the picker, the confirmation dialog, and their controls
+  with the shared `@deepseek-ai/dsh-client-ui-primitives` components: the confirmation leads with the warning icon
+  and closes from a header button, impact items are capsule `Tag`s, the chevron uses the host's 1px-stroke arrow,
+  and the menu paints the native translucent surface.
 
 ## 0.1.0
 

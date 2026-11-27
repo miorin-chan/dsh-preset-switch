@@ -339,6 +339,14 @@ const STYLES = `
   padding: 6px;
   overflow-wrap: anywhere;
 }
+/* The header sits inside the window frame's reserved strip, and the host's
+   overlay top (48px clearance + 20px on macOS) would leave this picker up to a
+   header's height below the chevron. Cap the margin at the trigger instead —
+   the same rule the host's own header overlays apply — while keeping the
+   viewport edge as the floor. */
+.dshps-menu[role='menu'][data-anchor-side='bottom'] {
+  top: max(12px, calc(anchor(bottom) + 6px));
+}
 .dshps-menu [role='menuitem'] {
   height: auto;
   padding: 8px 10px;
